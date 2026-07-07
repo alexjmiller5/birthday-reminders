@@ -25,7 +25,11 @@ justfile          dev / test / sync-secrets / deploy
 `Birthday-Reminders` 1Password vault only, never plaintext:
 
 - `NOTION_API_KEY` — Notion internal integration secret
-- `NTFY_TOPIC` — ntfy topic for iOS push
+- `NTFY_TOPIC` — ntfy topic for iOS push. Optional: defaults to
+  `bday-56hqsioQJ5-YM-ju7wfgag`, a randomly generated unguessable string
+  (random topics are ntfy.sh's only access control — anyone who knows the
+  topic can read it, so treat it like a password and override via the
+  1Password item if it ever leaks)
 
 Local dev: `op run --env-file=.env.tpl -- <cmd>`. Cloud: `just sync-secrets`
 pushes to the Modal secret store.
@@ -53,6 +57,9 @@ match `.env.tpl` and `.github/workflows/deploy.yml`):
 
 Other one-time steps that cannot be codified:
 
+- Install the [ntfy iOS app](https://apps.apple.com/app/ntfy/id1625396347)
+  and subscribe to the `NTFY_TOPIC` topic (default
+  `bday-56hqsioQJ5-YM-ju7wfgag`) — without this, pushes go nowhere
 - `uv run modal token new` — authenticate this machine with Modal
 - Mint a Proxy Auth Token in the Modal dashboard for HTTP callers
   (iPhone Shortcuts)

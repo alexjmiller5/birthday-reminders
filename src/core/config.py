@@ -9,4 +9,6 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     notion_api_key: str
-    ntfy_topic: str
+    # ntfy topics are the only auth ntfy.sh has — random and unguessable by design.
+    # Alex must subscribe to this topic in the ntfy iOS app (see README).
+    ntfy_topic: str = "bday-56hqsioQJ5-YM-ju7wfgag"
