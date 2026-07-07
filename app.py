@@ -2,7 +2,7 @@
 
 Business logic stays in src/core/ (plain Python, no Modal imports) so the
 same package runs on the mac mini, in tests, or anywhere else. This file
-only maps that logic onto Modal: image, secrets, endpoints, schedules.
+only maps that logic onto Modal: image, secrets, schedules.
 """
 
 import modal
@@ -22,28 +22,16 @@ image = (
 secrets = [modal.Secret.from_name(APP_NAME)]
 
 
-@app.function(image=image, secrets=secrets, timeout=600)
-def process(payload: dict) -> dict:
-    """Background worker — .spawn()ed from the webhook. spawn() IS the queue."""
+# Cron budget (Starter plan: 5 deployed crons TOTAL across all apps): as of
+# 2026-07-07 only synapse is deployed, with zero crons — this is 1/5.
+@app.function(
+    image=image,
+    secrets=secrets,
+    timeout=600,
+    schedule=modal.Cron("0 9 * * *", timezone="America/New_York"),
+)
+def daily_birthday_check() -> dict:
+    """9am New York daily: today's birthdays -> ntfy push + Notion task each."""
     from core.pipeline import run
 
-    return run(payload)
-
-
-@app.function(image=image, secrets=secrets)
-@modal.fastapi_endpoint(method="POST", requires_proxy_auth=True)
-def webhook(payload: dict) -> dict:
-    """HTTP entrypoint. Callers (iPhone Shortcuts) send Modal-Key + Modal-Secret
-    headers; unauthorized requests are rejected at Modal's edge, free."""
-    call = process.spawn(payload)
-    return {"status": "accepted", "call_id": call.object_id}
-
-
-# Modal cron is the preferred home for schedules (Starter plan: 5 deployed
-# crons TOTAL across all apps — overflow to GHA cron / CF Cron Triggers).
-# Delete this function if this service has no schedule.
-@app.function(image=image, secrets=secrets, schedule=modal.Cron("30 9 * * *"))
-def daily() -> dict:
-    from core.pipeline import run
-
-    return run({"trigger": "cron"})
+    return run()
