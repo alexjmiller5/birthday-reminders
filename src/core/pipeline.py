@@ -17,14 +17,20 @@ def run(today: datetime.date | None = None) -> dict:
     # ponytail: date.today() is UTC in the cloud; at a 9am New York cron that's
     # always the same calendar date as New York, so no tz math needed.
     today = today or datetime.date.today()
-    people = query_people(settings.notion_api_key)
+    people = query_people(settings.notion_api_key, settings.people_data_source_id)
     celebrants = todays_birthdays(people, today)
     log.info("birthday_check", people=len(people), birthdays=len(celebrants), date=str(today))
     birthdays = [
         {
             "name": p.name,
             "pushed": send_push(p.name, settings.ntfy_topic),
-            "task_id": create_birthday_task(p.name, settings.notion_api_key, today),
+            "task_id": create_birthday_task(
+                p.name,
+                settings.notion_api_key,
+                today,
+                settings.tasks_data_source_id,
+                settings.project_page_id,
+            ),
         }
         for p in celebrants
     ]

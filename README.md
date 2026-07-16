@@ -1,9 +1,9 @@
 # birthday-reminders
 
-Opt-in birthday reminders sourced from my Notion People DB. A daily Modal
+Opt-in birthday reminders sourced from a Notion People DB. A daily Modal
 cron checks for people with the "Birthday Notifications" checkbox whose
 birthday is today, sends an iOS push via [ntfy](https://ntfy.sh), and
-auto-creates a high-priority task in my Notion Tasks DB.
+auto-creates a high-priority task in a Notion Tasks DB.
 
 Built from the `modal-service` template — all infrastructure declared in
 `app.py` as code. The only entrypoint is a daily cron
@@ -26,56 +26,57 @@ justfile          dev / test / sync-secrets / deploy
 
 ## Secrets
 
-`.env.tpl` is the canonical manifest — op:// references into the
-`Birthday-Reminders` 1Password vault only, never plaintext:
+`.env.tpl` is the canonical manifest — op:// references into the project's
+1Password vault only, never plaintext:
 
 - `NOTION_API_KEY` — Notion internal integration secret
-- `NTFY_TOPIC` — ntfy topic for iOS push. Optional: defaults to
-  `bday-56hqsioQJ5-YM-ju7wfgag`, a randomly generated unguessable string
-  (random topics are ntfy.sh's only access control — anyone who knows the
-  topic can read it, so treat it like a password and override via the
-  1Password item if it ever leaks)
+- `NTFY_TOPIC` — ntfy topic for iOS push, `<random-topic>`. Generate one
+  (e.g. `openssl rand -base64 18 | tr -d '+/='`) — random topics are
+  ntfy.sh's only access control, so anyone who knows the topic can read it;
+  treat it like a password and rotate it if it ever leaks
+- `PEOPLE_DATA_SOURCE_ID` — Notion data source id of the People DB
+- `TASKS_DATA_SOURCE_ID` — Notion data source id of the Tasks DB
+- `PROJECT_PAGE_ID` — Notion page id of the project the created tasks
+  relate to
 
 Local dev: `op run --env-file=.env.tpl -- <cmd>`. Cloud: `just sync-secrets`
 pushes to the Modal secret store.
 
-## Manual setup (Alex)
+## Manual setup
 
-This scaffold was created under the restricted `claude-code` service account,
-which cannot create vaults or service accounts. Run these yourself:
+One-time steps that cannot be codified. Substitute your own vault and repo
+names (this repo's `.env.tpl` uses the vault name `Birthday-Reminders`):
 
 ```
-op vault create "Birthday-Reminders"
-OUT=$(op service-account create "birthday-reminders-ci" --vault "Birthday-Reminders:read_items" --format json </dev/null)
-op item create --category "API Credential" --title "birthday-reminders-ci SA Token" --vault Personal "token[concealed]=$(echo "$OUT" | jq -r .token)" </dev/null
-gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo alexjmiller5/birthday-reminders --body "$(op read 'op://Personal/birthday-reminders-ci SA Token/token')"
+op vault create "<vault>"
+OUT=$(op service-account create "<project>-ci" --vault "<vault>:read_items" --format json </dev/null)
+op item create --category "API Credential" --title "<project>-ci SA Token" --vault Personal "token[concealed]=$(echo "$OUT" | jq -r .token)" </dev/null
+gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo <owner>/<repo> --body "$(op read 'op://Personal/<project>-ci SA Token/token')"
 ```
 
-Then create these items in the `Birthday-Reminders` vault (names/fields must
-match `.env.tpl` and `.github/workflows/deploy.yml`):
+Then create these items in the vault (names/fields must match `.env.tpl`
+and `.github/workflows/deploy.yml`):
 
 - `Notion` — field `credential`: a Notion internal integration secret with
-  access to the People and Tasks DBs
-- `ntfy` — field `topic`: the ntfy topic subscribed on the iPhone
+  access to the People and Tasks DBs; fields `people-data-source-id` /
+  `tasks-data-source-id` / `project-page-id`: the Notion IDs from `.env.tpl`
+- `ntfy` — field `topic`: `<random-topic>` — generate one (e.g.
+  `openssl rand -base64 18 | tr -d '+/='`) and treat it like a password
 - `Modal Birthday-Reminders` — fields `token-id` / `token-secret`: Modal
   deploy token for CI
 
-Other one-time steps that cannot be codified:
+Other steps:
 
 - Install the [ntfy iOS app](https://apps.apple.com/app/ntfy/id1625396347)
-  and subscribe to the `NTFY_TOPIC` topic (default
-  `bday-56hqsioQJ5-YM-ju7wfgag`) — without this, pushes go nowhere
-- `uv run modal token new` — authenticate this machine with Modal (already
-  done on the current machine)
+  and subscribe to the `NTFY_TOPIC` topic — without this, pushes go nowhere
+- `uv run modal token new` — authenticate the machine with Modal
 
-### Deploy (not yet done)
+### Required Notion schema
 
-Code and tests are green but the app is NOT deployed: `just deploy` runs
-`just sync-secrets`, which needs the `Birthday-Reminders` vault above —
-confirmed missing on 2026-07-07 (the claude-code service account cannot
-create vaults). After the vault + items exist, run:
+Property names are matched exactly (see `src/core/birthdays.py` and
+`src/core/actions.py`):
 
-```
-just deploy
-uv run modal app list   # verify birthday-reminders shows up as deployed
-```
+- **People DB**: `Name` (title), `Birthday` (date), `Birthday Notifications`
+  (checkbox)
+- **Tasks DB**: `Name` (title), `Due Date` (date), `Priority` (select with a
+  `High` option), `Project` (relation), `Notes` (rich text)

@@ -5,14 +5,11 @@ from unittest.mock import Mock
 
 import httpx
 
-from core.actions import (
-    PROJECT_PAGE_ID,
-    TASKS_DATA_SOURCE_ID,
-    create_birthday_task,
-    send_push,
-)
+from core.actions import create_birthday_task, send_push
 
 TODAY = datetime.date(2026, 7, 6)
+TASKS_DATA_SOURCE_ID = "tasks-ds"
+PROJECT_PAGE_ID = "project-page"
 
 
 def response(status_code: int = 200, json_body: dict | None = None) -> Mock:
@@ -53,7 +50,13 @@ def test_create_task_happy_path(mocker):
     create_resp = response(200, {"id": "new-page-id"})
     post = mocker.patch("core.actions.httpx.post", side_effect=[query_resp, create_resp])
 
-    page_id = create_birthday_task("Sam", api_key="k", today=TODAY)
+    page_id = create_birthday_task(
+        "Sam",
+        api_key="k",
+        today=TODAY,
+        tasks_data_source_id=TASKS_DATA_SOURCE_ID,
+        project_page_id=PROJECT_PAGE_ID,
+    )
 
     assert page_id == "new-page-id"
     assert post.call_count == 2
@@ -86,5 +89,14 @@ def test_create_task_idempotent_skip(mocker):
     query_resp = response(200, {"results": [{"id": "existing-page"}]})
     post = mocker.patch("core.actions.httpx.post", return_value=query_resp)
 
-    assert create_birthday_task("Sam", api_key="k", today=TODAY) is None
+    assert (
+        create_birthday_task(
+            "Sam",
+            api_key="k",
+            today=TODAY,
+            tasks_data_source_id=TASKS_DATA_SOURCE_ID,
+            project_page_id=PROJECT_PAGE_ID,
+        )
+        is None
+    )
     post.assert_called_once()  # no create call

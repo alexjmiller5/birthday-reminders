@@ -11,9 +11,6 @@ import structlog
 
 log = structlog.get_logger()
 
-TASKS_DATA_SOURCE_ID = "77ef5074-aa23-468a-b5fb-2692e78184db"
-PROJECT_PAGE_ID = "31403953-a8af-8085-b9ac-ed69bc635779"  # Birthday Reminders App project
-_TASKS_QUERY_URL = f"https://api.notion.com/v1/data_sources/{TASKS_DATA_SOURCE_ID}/query"
 _PAGES_URL = "https://api.notion.com/v1/pages"
 
 
@@ -44,10 +41,17 @@ def send_push(name: str, ntfy_topic: str) -> bool:
     return True
 
 
-def create_birthday_task(name: str, api_key: str, today: datetime.date) -> str | None:
+def create_birthday_task(
+    name: str,
+    api_key: str,
+    today: datetime.date,
+    tasks_data_source_id: str,
+    project_page_id: str,
+) -> str | None:
     """Create a 'Wish <Name> a happy birthday' task due today; skip if it already
     exists (the cron may re-run). Returns the new page id, or None if skipped."""
     headers = _notion_headers(api_key)
+    tasks_query_url = f"https://api.notion.com/v1/data_sources/{tasks_data_source_id}/query"
     title = f"Wish {name} a happy birthday"
 
     query = {
@@ -59,19 +63,19 @@ def create_birthday_task(name: str, api_key: str, today: datetime.date) -> str |
         },
         "page_size": 1,
     }
-    resp = httpx.post(_TASKS_QUERY_URL, headers=headers, json=query, timeout=30)
+    resp = httpx.post(tasks_query_url, headers=headers, json=query, timeout=30)
     resp.raise_for_status()
     if resp.json()["results"]:
         log.info("task_already_exists", name=name, title=title)
         return None
 
     payload = {
-        "parent": {"type": "data_source_id", "data_source_id": TASKS_DATA_SOURCE_ID},
+        "parent": {"type": "data_source_id", "data_source_id": tasks_data_source_id},
         "properties": {
             "Name": {"title": [{"text": {"content": title}}]},
             "Priority": {"select": {"name": "High"}},  # exact existing option in Tasks schema
             "Due Date": {"date": {"start": today.isoformat()}},
-            "Project": {"relation": [{"id": PROJECT_PAGE_ID}]},
+            "Project": {"relation": [{"id": project_page_id}]},
             "Notes": {"rich_text": [{"text": {"content": "Auto-created by birthday-reminders"}}]},
         },
     }

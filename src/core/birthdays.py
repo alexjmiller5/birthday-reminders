@@ -6,9 +6,6 @@ from dataclasses import dataclass
 
 import httpx
 
-PEOPLE_DATA_SOURCE_ID = "1a803953-a8af-80ab-824d-000bfe407316"
-_QUERY_URL = f"https://api.notion.com/v1/data_sources/{PEOPLE_DATA_SOURCE_ID}/query"
-
 
 @dataclass(frozen=True)
 class Person:
@@ -17,8 +14,9 @@ class Person:
     birthday: datetime.date
 
 
-def query_people(api_key: str) -> list[Person]:
+def query_people(api_key: str, data_source_id: str) -> list[Person]:
     """People opted in to Birthday Notifications who have a Birthday set."""
+    query_url = f"https://api.notion.com/v1/data_sources/{data_source_id}/query"
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Notion-Version": "2026-03-11",
@@ -35,7 +33,7 @@ def query_people(api_key: str) -> list[Person]:
     }
     people: list[Person] = []
     while True:
-        resp = httpx.post(_QUERY_URL, headers=headers, json=body, timeout=30)
+        resp = httpx.post(query_url, headers=headers, json=body, timeout=30)
         resp.raise_for_status()
         data = resp.json()
         for page in data["results"]:

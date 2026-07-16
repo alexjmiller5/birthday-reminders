@@ -5,7 +5,9 @@ from unittest.mock import Mock
 
 import httpx
 
-from core.birthdays import PEOPLE_DATA_SOURCE_ID, Person, query_people, todays_birthdays
+from core.birthdays import Person, query_people, todays_birthdays
+
+PEOPLE_DATA_SOURCE_ID = "people-ds"
 
 
 def notion_page(page_id: str, name: str, birthday: str) -> dict:
@@ -40,7 +42,7 @@ def test_query_people_parses_pages(mocker):
         "core.birthdays.httpx.post",
         return_value=response([notion_page("p1", "Ada Lovelace", "1815-12-10")]),
     )
-    people = query_people("secret_key")
+    people = query_people("secret_key", PEOPLE_DATA_SOURCE_ID)
     assert people == [
         Person(page_id="p1", name="Ada Lovelace", birthday=datetime.date(1815, 12, 10))
     ]
@@ -52,7 +54,7 @@ def test_query_people_parses_pages(mocker):
 
 def test_query_people_filters_on_checkbox_and_birthday(mocker):
     post = mocker.patch("core.birthdays.httpx.post", return_value=response([]))
-    query_people("k")
+    query_people("k", PEOPLE_DATA_SOURCE_ID)
     sent_filter = post.call_args.kwargs["json"]["filter"]
     assert {"property": "Birthday Notifications", "checkbox": {"equals": True}} in sent_filter[
         "and"
@@ -68,7 +70,7 @@ def test_query_people_paginates(mocker):
             response([notion_page("p2", "B", "1991-02-02")]),
         ],
     )
-    people = query_people("k")
+    people = query_people("k", PEOPLE_DATA_SOURCE_ID)
     assert [p.page_id for p in people] == ["p1", "p2"]
     assert post.call_count == 2
     assert post.call_args_list[1].kwargs["json"]["start_cursor"] == "cur2"
@@ -78,7 +80,7 @@ def test_query_people_skips_malformed_dates(mocker):
     page = notion_page("p1", "Broken", "1990-01-01")
     page["properties"]["Birthday"]["date"] = None  # filter says non-empty, but be safe
     mocker.patch("core.birthdays.httpx.post", return_value=response([page]))
-    assert query_people("k") == []
+    assert query_people("k", PEOPLE_DATA_SOURCE_ID) == []
 
 
 # --- todays_birthdays (pure logic) ---
