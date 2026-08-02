@@ -1,4 +1,4 @@
-# CLAUDE.md
+# AGENTS.md
 
 Python service deployed on Modal: a single daily cron (9am America/New_York,
 timezone-aware `modal.Cron`) that runs the birthday pipeline.
@@ -26,7 +26,7 @@ Instantiate `Settings()` inside functions, never at import time.
 
 ## Commands
 
-Standard verb set (see global CLAUDE.md) — the justfile is the interface,
+Standard verb set (see global AGENTS.md) — the justfile is the interface,
 not a script catalog; one-offs go in `scripts/` and run directly.
 
 | Command | Purpose |
