@@ -76,6 +76,7 @@ def test_create_task_happy_path(mocker):
     props = body["properties"]
     assert props["Name"] == {"title": [{"text": {"content": "Wish Sam a happy birthday"}}]}
     assert props["Priority"] == {"select": {"name": "High"}}
+    assert props["Tags"] == {"multi_select": [{"name": "Chore"}]}
     assert props["Due Date"] == {"date": {"start": "2026-07-06"}}
     assert props["Project"] == {"relation": [{"id": PROJECT_PAGE_ID}]}
     assert props["Notes"] == {

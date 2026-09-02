@@ -74,6 +74,8 @@ def create_birthday_task(
         "properties": {
             "Name": {"title": [{"text": {"content": title}}]},
             "Priority": {"select": {"name": "High"}},  # exact existing option in Tasks schema
+            # tasks without a Tag fall out of the Tasks DB's filtered views
+            "Tags": {"multi_select": [{"name": "Chore"}]},
             "Due Date": {"date": {"start": today.isoformat()}},
             "Project": {"relation": [{"id": project_page_id}]},
             "Notes": {"rich_text": [{"text": {"content": "Auto-created by birthday-reminders"}}]},

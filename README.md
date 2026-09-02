@@ -79,4 +79,5 @@ Property names are matched exactly (see `src/core/birthdays.py` and
 - **People DB**: `Name` (title), `Birthday` (date), `Birthday Notifications`
   (checkbox)
 - **Tasks DB**: `Name` (title), `Due Date` (date), `Priority` (select with a
-  `High` option), `Project` (relation), `Notes` (rich text)
+  `High` option), `Tags` (multi_select with a `Chore` option), `Project`
+  (relation), `Notes` (rich text)
