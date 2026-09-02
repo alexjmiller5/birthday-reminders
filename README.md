@@ -50,19 +50,19 @@ names (this repo's `.env.tpl` uses the vault name `Birthday-Reminders`):
 ```
 op vault create "<vault>"
 OUT=$(op service-account create "<project>-ci" --vault "<vault>:read_items" --format json </dev/null)
-op item create --category "API Credential" --title "<project>-ci SA Token" --vault Personal "token[concealed]=$(echo "$OUT" | jq -r .token)" </dev/null
-gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo <owner>/<repo> --body "$(op read 'op://Personal/<project>-ci SA Token/token')"
+op item create --category "API Credential" --title "<Project> CI op Service Account Token" --vault Personal "token[concealed]=$(echo "$OUT" | jq -r .token)" </dev/null
+gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo <owner>/<repo> --body "$(op read 'op://Personal/<Project> CI op Service Account Token/token')"
 ```
 
 Then create these items in the vault (names/fields must match `.env.tpl`
 and `.github/workflows/deploy.yml`):
 
-- `Notion` — field `credential`: a Notion internal integration secret with
+- `Birthday-Reminders Notion API Key` — field `credential`: a Notion internal integration secret with
   access to the People and Tasks DBs; fields `people-data-source-id` /
   `tasks-data-source-id` / `project-page-id`: the Notion IDs from `.env.tpl`
-- `ntfy` — field `topic`: `<random-topic>` — generate one (e.g.
+- `Birthday-Reminders ntfy Topic` — field `topic`: `<random-topic>` — generate one (e.g.
   `openssl rand -base64 18 | tr -d '+/='`) and treat it like a password
-- `Modal Birthday-Reminders` — fields `token-id` / `token-secret`: Modal
+- `Birthday-Reminders CI Modal Token` — fields `token-id` / `token-secret`: Modal
   deploy token for CI
 
 Other steps:
