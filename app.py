@@ -23,7 +23,7 @@ secrets = [modal.Secret.from_name(APP_NAME)]
 
 
 # Cron budget (Starter plan: 5 deployed crons TOTAL across all apps): as of
-# 2026-07-07 only synapse is deployed, with zero crons — this is 1/5.
+# 2026-09-02 notion-automations has 1 — this one makes 2/5.
 @app.function(
     image=image,
     secrets=secrets,

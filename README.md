@@ -12,7 +12,7 @@ DST is handled). The template's HTTP webhook + spawned worker were deleted as
 unused; restore from the template if an HTTP caller ever appears.
 
 Cron budget: Modal Starter allows 5 deployed crons across ALL apps. As of
-2026-07-07 only `synapse` is deployed with zero crons, so this app takes 1/5.
+2026-09-02 the deployed crons are `notion-automations` (1) and this app — 2/5.
 
 ## Layout
 

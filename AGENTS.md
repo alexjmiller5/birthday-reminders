@@ -15,7 +15,7 @@ runs in tests, on the mac mini via launchd, or on any future platform.
   expose an unauthenticated endpoint.
 - Cron: Modal is the PREFERRED home for schedules — but the Starter plan
   allows **5 deployed crons across ALL apps**, so track the budget. Overflow
-  goes to GHA cron or CF Cron Triggers (see the `personal-infra` skill).
+  goes to GHA cron or CF Cron Triggers (see the `infra` skill).
 
 ## Stack
 
