@@ -45,7 +45,7 @@ pushes to the Modal secret store.
 ## Manual setup
 
 One-time steps that cannot be codified. Substitute your own vault and repo
-names (this repo's `.env.tpl` uses the vault name `Birthday-Reminders`):
+names (this repo's `.env.tpl` uses the vault name `Birthday Reminders`):
 
 ```
 op vault create "<vault>"
@@ -57,12 +57,12 @@ gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo <owner>/<repo> --body "$(op read '
 Then create these items in the vault (names/fields must match `.env.tpl`
 and `.github/workflows/deploy.yml`):
 
-- `Birthday-Reminders Notion API Key` — field `credential`: a Notion internal integration secret with
+- `Birthday Reminders Notion API Key` — field `credential`: a Notion internal integration secret with
   access to the People and Tasks DBs; fields `people-data-source-id` /
   `tasks-data-source-id` / `project-page-id`: the Notion IDs from `.env.tpl`
-- `Birthday-Reminders ntfy Topic` — field `topic`: `<random-topic>` — generate one (e.g.
+- `Birthday Reminders ntfy Topic` — field `topic`: `<random-topic>` — generate one (e.g.
   `openssl rand -base64 18 | tr -d '+/='`) and treat it like a password
-- `Birthday-Reminders CI Modal Token` — fields `token-id` / `token-secret`: Modal
+- `Birthday Reminders CI Modal Token` — fields `token-id` / `token-secret`: Modal
   deploy token for CI
 
 Other steps:
