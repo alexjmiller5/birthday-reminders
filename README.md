@@ -44,32 +44,26 @@ pushes to the Modal secret store.
 
 ## Manual setup
 
-One-time steps that cannot be codified. Substitute your own vault and repo
-names (this repo's `.env.tpl` uses the vault name `Birthday Reminders`):
+Run bootstrap with your repository name. This repo's `.env.tpl` uses the
+vault name `Birthday Reminders`:
 
-```
-op vault create "<vault>"
-OUT=$(op service-account create "<project>-ci" --vault "<vault>:read_items" --format json </dev/null)
-op item create --category "API Credential" --title "<Project> CI op Service Account Token" --vault Personal "token[concealed]=$(echo "$OUT" | jq -r .token)" </dev/null
-gh secret set OP_SERVICE_ACCOUNT_TOKEN --repo <owner>/<repo> --body "$(op read 'op://Personal/<Project> CI op Service Account Token/token')"
+```bash
+op-project-bootstrap .env.tpl --repo <owner>/<repo>
 ```
 
-Then create these items in the vault (names/fields must match `.env.tpl`
-and `.github/workflows/deploy.yml`):
+Bootstrap reads `.env.tpl` and the deploy workflow to create the project
+vault, environment item, dedicated Modal CI token, and read-only CI service
+account. Fill the environment fields with this project's own credentials.
 
-- `Birthday Reminders Notion API Key` — field `credential`: a Notion internal integration secret with
-  access to the People and Tasks DBs; fields `people-data-source-id` /
-  `tasks-data-source-id` / `project-page-id`: the Notion IDs from `.env.tpl`
-- `Birthday Reminders ntfy Topic` — field `topic`: `<random-topic>` — generate one (e.g.
-  `openssl rand -base64 18 | tr -d '+/='`) and treat it like a password
-- `Birthday Reminders CI Modal Token` — fields `token-id` / `token-secret`: Modal
-  deploy token for CI
+`scripts/provision.py` emits a Modal approval URL and verification code on
+stderr. Open that URL in the configured remote browser session (agents use
+chrome-control) and approve the code. It verifies the new token pair in
+memory; bootstrap saves both fields to `Birthday Reminders CI Modal Token`
+at once through JSON stdin. It never opens a local browser or writes a
+provider config or temporary credential file.
 
-Other steps:
-
-- Install the [ntfy iOS app](https://apps.apple.com/app/ntfy/id1625396347)
-  and subscribe to the `NTFY_TOPIC` topic — without this, pushes go nowhere
-- `uv run modal token new` — authenticate the machine with Modal
+Install the [ntfy iOS app](https://apps.apple.com/app/ntfy/id1625396347) and
+subscribe to the configured `NTFY_TOPIC` topic to receive notifications.
 
 ### Required Notion schema
 

@@ -41,3 +41,12 @@ not a script catalog; one-offs go in `scripts/` and run directly.
 
 Write the test in `tests/` first, then the `src/core/` code. `app.py` shim
 functions stay thin enough to not need tests.
+
+## Credential provisioning
+
+`scripts/provision.py` implements `--list`, `--batches`, and
+`--batch modal-token` for `op-project-bootstrap`. Modal CI credentials are
+minted and verified as a pair in memory, then saved atomically to the project
+vault. The operator opens the stderr approval URL in the configured remote
+browser session (agents use chrome-control) and approves its code. Do not
+use `modal token new` or write a temporary credential config.
