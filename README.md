@@ -27,9 +27,12 @@ justfile          dev / test / sync-secrets / deploy
 ## Secrets
 
 `.env.tpl` is the canonical manifest — op:// references into the project's
-1Password vault only, never plaintext:
+1Password vault only. All five runtime fields live in its single
+`Birthday Reminders ENV` item:
 
-- `NOTION_API_KEY` — Notion internal integration secret
+- `NOTION_API_KEY` - this app's own Notion integration with Read and Insert
+  content capabilities, access to the People and Tasks databases, and access
+  to the specific project page used by its task relation
 - `NTFY_TOPIC` — ntfy topic for iOS push, `<random-topic>`. Generate one
   (e.g. `openssl rand -base64 18 | tr -d '+/='`) — random topics are
   ntfy.sh's only access control, so anyone who knows the topic can read it;

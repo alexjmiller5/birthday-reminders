@@ -50,3 +50,16 @@ minted and verified as a pair in memory, then saved atomically to the project
 vault. The operator opens the stderr approval URL in the configured remote
 browser session (agents use chrome-control) and approves its code. Do not
 use `modal token new` or write a temporary credential config.
+
+Birthday Reminders owns its Modal app, runtime Secret, daily schedule, and
+independently minted CI token. The CI token is stored only in its project
+vault. Modal Starter personal tokens retain workspace-level permissions;
+this accepted provider limitation allows independent rotation but does not
+enforce access to just this app. Environment-scoped service users require
+[Team or Enterprise](https://modal.com/docs/guide/service-users).
+
+All runtime variables come from `Birthday Reminders ENV`; `.env.tpl`
+references its five env-named fields. The separate CI Modal item never
+reaches the runtime. The app's own Notion integration has Read and Insert
+content capabilities for People, Tasks, and its specific project page;
+Update content, comments, and user information are disabled.
