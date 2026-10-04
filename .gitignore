@@ -6,3 +6,9 @@ __pycache__/
 .env.resolved
 *.local
 .DS_Store
+.build/
+.swiftpm/
+ios/*.xcodeproj/
+ios/App/Info.plist
+ios/build/
+ios/logs/

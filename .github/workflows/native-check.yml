@@ -1,0 +1,30 @@
+name: Native app checks
+
+on:
+  push:
+    branches: [native-ios]
+  pull_request:
+    paths: ['ios/**', 'Package.swift', '.github/workflows/native-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v7
+      - name: Test birthday core
+        run: swift test --scratch-path "$RUNNER_TEMP/birthday-core"
+      - name: Install project generator
+        run: brew install xcodegen
+      - name: Generate native project
+        working-directory: ios
+        run: '"$(realpath "$(command -v xcodegen)")" generate --spec project.yml'
+      - name: Build for iPhone simulator
+        working-directory: ios
+        run: >-
+          xcodebuild -project BirthdayReminders.xcodeproj
+          -scheme BirthdayReminders -destination 'generic/platform=iOS Simulator'
+          -derivedDataPath "$RUNNER_TEMP/birthday-ios"
+          CODE_SIGNING_ALLOWED=NO build
