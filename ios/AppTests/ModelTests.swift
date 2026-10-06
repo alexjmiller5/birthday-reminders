@@ -12,7 +12,50 @@ private final class OfflineProtocol: URLProtocol {
   override func stopLoading() {}
 }
 
+private final class AcceptedProtocol: URLProtocol {
+  override class func canInit(with request: URLRequest) -> Bool { true }
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+  override func startLoading() {
+    let body = request.url!.path == "/v1/session"
+      ? #"{"name":"synthetic-device","scopes":["tables:read"]}"#
+      : #"{"rows":[],"next_cursor":null}"#
+    client?.urlProtocol(self, didReceive: HTTPURLResponse(
+      url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+      cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(body.utf8))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+  override func stopLoading() {}
+}
+
 final class ModelTests: XCTestCase {
+  @MainActor func testFailedCacheSavePreservesAcceptedCredential() async throws {
+    let id = UUID().uuidString
+    let credentials = ConnectionStore(service: id)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(id)
+    let defaults = UserDefaults(suiteName: id)!
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    let blocker = directory.appendingPathComponent("not-a-directory")
+    try Data("blocked".utf8).write(to: blocker)
+    defer {
+      try? credentials.clear()
+      defaults.removePersistentDomain(forName: id)
+      try? FileManager.default.removeItem(at: directory)
+    }
+    try credentials.save(Connection(
+      endpoint: "https://accepted.example", token: "accepted-fixture", source: PeopleSource()))
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.protocolClasses = [AcceptedProtocol.self]
+    let model = BirthdayModel(
+      cache: BirthdayCache(url: blocker.appendingPathComponent("birthdays.json")),
+      credentials: credentials, defaults: defaults, session: URLSession(configuration: configuration))
+    let connected = await model.connect(
+      endpoint: "https://candidate.example", token: "candidate-fixture", source: PeopleSource())
+    XCTAssertFalse(connected)
+    XCTAssertEqual(model.connection?.token, "accepted-fixture")
+    XCTAssertEqual(try credentials.load()?.token, "accepted-fixture")
+  }
+
   @MainActor func testDisconnectCannotRaceNotificationAuthorization() async throws {
     try await checkDisconnectDuringAuthorization(sendTest: false)
   }
