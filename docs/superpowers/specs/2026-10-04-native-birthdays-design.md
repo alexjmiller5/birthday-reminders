@@ -40,21 +40,37 @@ not a personal schema installed by this app. Existing people records supply
 opt-in decisions; the native app may mute reminders locally without changing
 the source. Changes to the authoritative directory use its own UI.
 
-The currently documented table scopes are dataset-wide. No live credential
-is provisioned until the narrowest available scope is verified and any broader
-access is explicitly accepted. The app never receives infrastructure credentials.
+Exact-table scopes permit whole-table access. Enforced People projection and
+create-only Tasks enrollment remain prerequisites for live credentials. No
+broad access fallback is authorized. The app never receives infrastructure
+credentials.
 
 ## Tasks dependency
 
-The Life Data tasks table is being prepared separately. Its absence must not
-disable native birthday notifications. Do not create a competing tasks table,
-write to Notion as a fallback, or claim task creation is working.
+The published Tasks catalog supplies required `title`, date-or-datetime
+`due_date`/`completed_date`, optional `person_ids` and `project_ids` multi-refs,
+and optional status, priority and tags. Schema publication is separate from
+historical dedupe coverage, credentials, and authority cutover. Do not create a
+competing table, write to Notion as a fallback, or claim live task creation.
 
-After its catalog is available, a server-side daily job will insert a task once
+Once enrollment and dedupe review are ready, a server-side daily job will insert a task once
 per person/year using the supported insert-if-absent API. The actual required
 fields, person/project references, status, priority, tags, date semantics and
 ID constraints come from that catalog. Preserve completed or edited tasks on
 retry. Phone background execution is not responsible for daily task creation.
+
+The adapter uses `/v1/rows/insert` with explicit IDs, declared columns and row
+objects. It validates complete, disjoint inserted/existing/rejected receipts;
+errors never trigger push/patch fallbacks. Batches are at most 200 rows.
+Same-ID retries preserve canceled and tombstoned rows as well as completed rows.
+The service owns atomicity and lineage; the consumer grants no provenance access.
+
+IDs are lowercase 32-hex UUIDv5 in a fixed app-owned namespace, using UTF-8 compact
+JSON `["v1","birthday",personId,occurrenceYear]`. Person IDs are byte-exact.
+Retained migration occurrence mappings override generated IDs. Birthday due dates
+are actual occurrence labels, including February 29 observance, regardless of
+refresh time or saved-view day boundaries. New task policy is explicit caller
+configuration, not inferred from historical catalog options.
 
 ## Completion criteria
 

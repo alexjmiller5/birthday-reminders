@@ -35,9 +35,16 @@ Changing it or pushing main can affect the live service.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
-- Life Data task creation is not active. Tasks and Projects schemas are published;
-  integrate only against that actual catalog contract; never create provisional task tables or fall
-  back to writing Notion from the native app.
+- `src/core/life_tasks.py` plans Tasks rows against the published catalog and
+  calls `/v1/rows/insert`. It is not connected to the cron. Live activation
+  requires narrow enrollment, complete People reads, reviewed historical
+  occurrence mappings and explicit creation policy. Never use a provisional
+  table or write Notion as a native fallback.
+- Task IDs use the durable application namespace in `life_tasks.py`, UUIDv5
+  over UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`, with
+  byte-exact person IDs. Preserve retained occurrence mappings first. Keep
+  birthday due dates as calendar labels; edit timestamps do not alter identity.
+  Never rotate the namespace with credentials or overwrite existing tasks.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
   Birthday-field read enrollment is configured. Create-only Tasks enrollment

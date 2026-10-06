@@ -1,0 +1,17 @@
+name: Python checks
+
+on:
+  pull_request:
+    paths: ['src/**', 'tests/**', 'scripts/**', 'pyproject.toml', 'uv.lock', '.github/workflows/python-check.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+      - run: uv run --locked ruff check .
+      - run: uv run --locked pytest -q
