@@ -1,4 +1,4 @@
-"""Life Data birthday task planning and insert-only transport.
+"""Life Data birthday task planning and atomic-origin creation transport.
 
 Not connected to the cron. Enrollment, complete People reads, migration dedupe
 coverage and creation policy must be established before enabling a live caller.
@@ -10,6 +10,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from typing import Protocol
 from uuid import UUID, uuid5
 
 import httpx
@@ -39,7 +40,7 @@ def occurrence_id(person_id: str, year: int) -> str:
 class BirthdayPerson:
     id: str
     name: str
-    birthday: str
+    birthday: str | None
     notify_birthday: bool
     deleted_at: str | None = None
 
@@ -116,87 +117,97 @@ def plan_tasks(
         seen_people.add(person.id)
         if person.deleted_at is not None or not person.notify_birthday:
             continue
+        if person.birthday is None or person.birthday == "":
+            continue
         if not _nonempty(person.name):
             raise ValueError("Missing display name")
         if _month_day(person.birthday, day.year) != (day.month, day.day):
             continue
-        task_id = retained_ids.get((person.id, day.year), occurrence_id(person.id, day.year))
+        key = (person.id, day.year)
+        adopted = key in retained_ids
+        task_id = retained_ids[key] if adopted else occurrence_id(person.id, day.year)
         if not _nonempty(task_id) or task_id in seen_tasks:
             raise ValueError("Invalid or conflicting retained task identity")
         seen_tasks.add(task_id)
         rows.append(
             {
-                "id": task_id,
-                "title": f"Wish {person.name} a happy birthday",
-                "due_date": day.isoformat(),
-                "person_ids": _json([person.id]),
-                "updated_at": stamp,
-                **fields,
+                "sourceId": person.id,
+                "occurrenceKey": day.year,
+                "target": {"kind": "adopted" if adopted else "generated", "id": task_id},
+                "updatedAt": stamp,
+                "values": {
+                    "title": f"Wish {person.name} a happy birthday",
+                    "due_date": day.isoformat(),
+                    "person_ids": _json([person.id]),
+                    **fields,
+                },
             }
         )
     return rows
 
 
-def _validate_receipt(receipt, ids: set[str]) -> None:
-    try:
-        if not isinstance(receipt, dict) or not all(
-            isinstance(receipt.get(key), list) for key in ("inserted", "existing", "rejected")
-        ):
-            raise ValueError
-        reported = (
-            receipt["inserted"]
-            + receipt["existing"]
-            + [rejection["id"] for rejection in receipt["rejected"]]
-        )
-        if not all(isinstance(item, str) for item in reported):
-            raise ValueError
-        if len(reported) != len(ids) or set(reported) != ids:
-            raise ValueError
-    except (KeyError, TypeError, ValueError):
-        raise ValueError("Invalid Life Data insert receipt") from None
+class CreationValidator(Protocol):
+    """Host binding to Life Core's canonical pure checks, not a second validator."""
+
+    def validate_session(self, reply: dict, policy: dict, scopes: Sequence[str]) -> bool: ...
+
+    def validate_receipt(self, request: dict, reply: dict) -> dict | None: ...
 
 
-class InsertInterrupted(RuntimeError):
-    """Request failure, with all validated receipts from earlier batches."""
+class CreationInterrupted(RuntimeError):
+    """Indeterminate/error outcome with validated receipts from earlier requests."""
 
     def __init__(self, receipt: dict):
-        super().__init__("Life Data insert interrupted; inspect partial receipt before retrying")
+        super().__init__("Life Data creation interrupted; inspect receipts before retrying")
         self.receipt = receipt
 
 
-def insert_tasks(client: httpx.Client, rows: Sequence[dict]) -> dict:
-    """Use the supported atomic insert API, never push/patch or a fallback.
+def create_tasks(
+    client: httpx.Client,
+    intents: Sequence[dict],
+    *,
+    policy: dict,
+    scopes: Sequence[str],
+    validator: CreationValidator,
+) -> dict:
+    """Create one task plus origin per request under the exact advertised grant.
 
-    Client enrollment must establish create-only authority before live use.
-    Rejections are returned, not counted as successes. Transport/receipt errors
-    raise InsertInterrupted with prior receipts and the original cause. The
-    caller can replay the same planned IDs, including earlier successful chunks.
-    The service preserves existing/tombstoned rows.
+    The host supplies a pinned canonical validator and a dedicated credential.
+    There is deliberately no default validator or configured live writer. Errors
+    stop this batch, preserve prior receipts and never trigger a fallback/retry.
+    A caller may retry identical intent; existing settles presence only, without
+    attributing creation. Adopted missing is an error, never a generated insert.
     """
     if client.base_url.scheme != "https":
         raise ValueError("Life Data requires an HTTPS endpoint")
-    ids = [row.get("id") for row in rows]
+    try:
+        ids = [intent["target"]["id"] for intent in intents]
+    except (KeyError, TypeError):
+        raise ValueError("Invalid task target") from None
     if not all(map(_nonempty, ids)) or len(set(ids)) != len(ids):
         raise ValueError("Task IDs must be nonempty and unique")
-    result = {"inserted": [], "existing": [], "rejected": []}
-    for start in range(0, len(rows), 200):
-        batch = rows[start : start + 200]
-        try:
+    result = {"created": [], "existing": []}
+    if not intents:
+        return result
+    try:
+        response = client.get("/v1/session", follow_redirects=False, timeout=30)
+        response.raise_for_status()
+        if not validator.validate_session(
+            {"status": response.status_code, "data": response.json()}, policy, scopes
+        ):
+            raise ValueError("Unsupported Life Data creation session")
+        for intent in intents:
+            request = {**intent, "policy": dict(policy)}
             response = client.post(
-                "/v1/rows/insert",
-                json={
-                    "table": "tasks",
-                    "columns": list(dict.fromkeys(k for r in batch for k in r)),
-                    "rows": batch,
-                },
-                follow_redirects=False,
-                timeout=30,
+                "/v1/rows/create", json=request, follow_redirects=False, timeout=30
             )
             response.raise_for_status()
-            receipt = response.json()
-            _validate_receipt(receipt, set(ids[start : start + 200]))
-        except (httpx.HTTPError, ValueError) as error:
-            raise InsertInterrupted(result) from error
-        for key in result:
-            result[key].extend(receipt[key])
+            receipt = validator.validate_receipt(
+                request, {"status": response.status_code, "data": response.json()}
+            )
+            if receipt is None:
+                raise ValueError("Invalid Life Data creation receipt")
+            result[receipt["kind"]].append(receipt)
+    except (httpx.HTTPError, ValueError) as error:
+        raise CreationInterrupted(result) from error
     return result

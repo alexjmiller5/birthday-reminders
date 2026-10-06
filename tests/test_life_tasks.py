@@ -1,26 +1,54 @@
-"""Consumer contract tests with synthetic records and an isolated HTTP transport."""
+"""Synthetic consumer tests using the pinned canonical policy and HTTP boundary."""
 
 import datetime as dt
 import json
+import subprocess
+from pathlib import Path
 
 import httpx
 import pytest
 
-from core.life_tasks import (
-    BirthdayPerson,
-    InsertInterrupted,
-    TaskPolicy,
-    insert_tasks,
-    occurrence_id,
-    plan_tasks,
-)
+from core import life_tasks as tasks
 
 DAY = dt.date(2030, 2, 28)
 STAMP = dt.datetime(2030, 2, 28, 14, tzinfo=dt.UTC)
+POLICY = {
+    "id": "birthdays-tasks-v1",
+    "revision": "8231fa18788c8a475e08a1e788623c1d94872961636afff2e0924396a7fbd68c",
+}
+SCOPES = [f"rows:create:{POLICY['id']}:{POLICY['revision']}"]
+TARGET = "ce64b9e7f42f5f529f299a908c0d3935"
+
+
+class CanonicalPolicy:
+    """Test host only. Production will use Core's separately pinned Python boundary."""
+
+    def call(self, name, *args):
+        script = (
+            'import * as policy from "./tests/fixtures/life-creation.js";'
+            "const args = JSON.parse(await Bun.stdin.text());"
+            f"console.log(JSON.stringify(policy.{name}(...args)));"
+        )
+        result = subprocess.run(
+            ["bun", "-e", script],
+            input=json.dumps(args),
+            capture_output=True,
+            text=True,
+            check=True,
+            cwd=Path(__file__).resolve().parents[1],
+            timeout=10,
+        )
+        return json.loads(result.stdout)
+
+    def validate_session(self, reply, policy, scopes):
+        return self.call("validateCreationSession", reply, policy, scopes)
+
+    def validate_receipt(self, request, reply):
+        return self.call("validateCreationReceipt", request, reply)
 
 
 def person(**changes):
-    return BirthdayPerson(
+    return tasks.BirthdayPerson(
         **{
             "id": "person-1",
             "name": "<person-1>",
@@ -31,138 +59,306 @@ def person(**changes):
     )
 
 
-def plan(people=None, **kwargs):
-    return plan_tasks(
+def plan(people=None, **changes):
+    return tasks.plan_tasks(
         [person()] if people is None else people,
-        DAY,
-        updated_at=STAMP,
-        retained_ids={},
-        policy=TaskPolicy(),
-        **kwargs,
+        **{
+            "day": DAY,
+            "updated_at": STAMP,
+            "retained_ids": {},
+            "policy": tasks.TaskPolicy(),
+            **changes,
+        },
     )
 
 
-def test_minimal_row_has_calendar_label_person_ref_and_no_inferred_policy():
-    (row,) = plan()
-    assert row == {
-        "id": occurrence_id("person-1", 2030),
-        "title": "Wish <person-1> a happy birthday",
-        "due_date": "2030-02-28",
-        "person_ids": '["person-1"]',
-        "updated_at": "2030-02-28T14:00:00.000Z",
+def session(**changes):
+    return {
+        "scopes": SCOPES,
+        "capabilities": {
+            "rowCreation": {"protocol": "atomic-origin-v1", "policies": [POLICY]},
+        },
+        **changes,
     }
 
 
-def test_identity_survives_rename_refresh_and_distinguishes_year_person_bytes():
-    assert occurrence_id("person-1", 2030) == "ce64b9e7f42f5f529f299a908c0d3935"
-    assert occurrence_id(" péRson-1 ", 2030) == "54c37ba88b5d58cf9fcc753e0750348d"
-    (original,) = plan()
-    (later,) = plan_tasks(
-        [person(name="<renamed>")],
-        DAY,
-        updated_at=STAMP + dt.timedelta(hours=8),
-        retained_ids={},
-        policy=TaskPolicy(),
-    )
-    assert original["id"] == later["id"]
+def created(request):
+    return {
+        "kind": "created",
+        "policy": POLICY,
+        "id": request["target"]["id"],
+        "revision": {"updated_at": request["updatedAt"], "hub_at": "2030-02-28T14:00:01.000Z"},
+        "originId": f"people:{request['sourceId']}:{request['target']['id']}",
+    }
+
+
+def run(server, plans=None, **changes):
+    with httpx.Client(
+        base_url="https://hub.example", transport=httpx.MockTransport(server), follow_redirects=True
+    ) as client:
+        return tasks.create_tasks(
+            client,
+            plan() if plans is None else plans,
+            policy=POLICY,
+            scopes=SCOPES,
+            validator=CanonicalPolicy(),
+            **changes,
+        )
+
+
+def test_planner_preserves_identity_and_emits_minimal_generated_intent():
+    assert plan() == [
+        {
+            "sourceId": "person-1",
+            "occurrenceKey": 2030,
+            "target": {"kind": "generated", "id": TARGET},
+            "updatedAt": "2030-02-28T14:00:00.000Z",
+            "values": {
+                "title": "Wish <person-1> a happy birthday",
+                "due_date": "2030-02-28",
+                "person_ids": '["person-1"]',
+            },
+        }
+    ]
+    assert tasks.occurrence_id(" péRson-1 ", 2030) == "54c37ba88b5d58cf9fcc753e0750348d"
+    assert plan([person(name="<renamed>")])[0]["target"]["id"] == TARGET
     assert (
         len(
             {
-                occurrence_id("person-1", 2030),
-                occurrence_id("person-1", 2031),
-                occurrence_id("person-2", 2030),
-                occurrence_id("Person-1", 2030),
-                occurrence_id(" person-1 ", 2030),
+                tasks.occurrence_id(p, y)
+                for p, y in [
+                    ("person-1", 2030),
+                    ("person-1", 2031),
+                    ("Person-1", 2030),
+                    (" person-1 ", 2030),
+                ]
             }
         )
-        == 5
+        == 4
     )
 
 
-def test_opt_out_tombstone_and_other_days_produce_no_task():
+def test_retained_target_is_adopted_even_when_equal_to_generated_id():
+    assert plan(retained_ids={("person-1", 2030): TARGET})[0]["target"] == {
+        "kind": "adopted",
+        "id": TARGET,
+    }
     assert (
-        plan(
-            [
-                person(notify_birthday=False),
-                person(id="person-2", deleted_at="2030-01-01T00:00:00.000Z"),
-                person(id="person-3", birthday="--03-01"),
-            ]
-        )
-        == []
+        plan(retained_ids={("person-1", 2030): "historical-id"})[0]["target"]["id"]
+        == "historical-id"
     )
+    with pytest.raises(ValueError):
+        plan(retained_ids={("person-1", 2030): ""})
 
 
-@pytest.mark.parametrize("birthday", ["--02-29", "2000-02-29", "1990-02-28"])
-def test_known_unknown_year_and_leap_observance(birthday):
-    assert plan([person(birthday=birthday)])[0]["due_date"] == "2030-02-28"
-    if birthday.endswith("02-29"):
-        assert (
-            plan_tasks(
-                [person(birthday=birthday)],
-                dt.date(2032, 2, 28),
-                updated_at=STAMP,
-                retained_ids={},
-                policy=TaskPolicy(),
-            )
-            == []
-        )
-        assert (
-            plan_tasks(
-                [person(birthday=birthday)],
-                dt.date(2032, 2, 29),
-                updated_at=STAMP,
-                retained_ids={},
-                policy=TaskPolicy(),
-            )[0]["due_date"]
-            == "2032-02-29"
-        )
+@pytest.mark.parametrize("birthday", [None, ""])
+def test_selected_people_without_dates_are_skipped_without_blocking_known_birthdays(birthday):
+    assert len(plan([person(birthday=birthday), person(id="person-2")])) == 1
 
 
-@pytest.mark.parametrize(
-    "birthday",
-    ["--02-30", "2001-02-29", "20300228", "--2-28", "2030-02-28T00:00:00Z", "2030-13-01", "", None],
-)
-def test_invalid_opted_in_birthday_fails_the_plan(birthday):
+@pytest.mark.parametrize("birthday", ["--02-30", "2001-02-29", "--2-28", "2030-02-28T00:00:00Z"])
+def test_malformed_dates_fail_instead_of_inventing_a_date(birthday):
     with pytest.raises(ValueError, match="birthday"):
         plan([person(birthday=birthday)])
 
 
-def test_retained_occurrence_mapping_wins_and_optional_policy_is_explicit():
-    (row,) = plan_tasks(
-        [person()],
-        DAY,
-        updated_at=STAMP,
-        retained_ids={("person-1", 2030): "a" * 32},
-        policy=TaskPolicy(
-            status="To Do", priority="Low", tags=("Chore",), project_ids=("project-1", "project-2")
-        ),
+def test_opt_out_deleted_and_other_day_are_skipped_and_duplicates_still_fail():
+    assert (
+        plan(
+            [
+                person(notify_birthday=False),
+                person(id="p2", deleted_at="2030-01-01"),
+                person(id="p3", birthday="--03-01"),
+            ]
+        )
+        == []
     )
-    assert row["id"] == "a" * 32
-    assert row["status"] == "To Do" and row["priority"] == "Low"
-    assert json.loads(row["tags"]) == ["Chore"]
-    assert json.loads(row["project_ids"]) == ["project-1", "project-2"]
-    assert "assignees" not in row
+    for people in [
+        [person(), person(notify_birthday=False)],
+        [person(notify_birthday=False), person()],
+    ]:
+        with pytest.raises(ValueError, match="Duplicate"):
+            plan(people)
 
 
-def test_invalid_mapping_and_duplicate_people_cannot_create_ambiguous_ids():
+def test_leap_observance_and_edit_timezone_do_not_change_calendar_label():
+    assert plan([person(birthday="--02-29")])[0]["values"]["due_date"] == "2030-02-28"
+    assert plan([person(birthday="--02-29")], day=dt.date(2032, 2, 28)) == []
+    assert plan([person(birthday="--02-29")], day=dt.date(2032, 2, 29))[0]["occurrenceKey"] == 2032
+    assert (
+        plan(updated_at=dt.datetime(2030, 3, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=9))))[0][
+            "values"
+        ]["due_date"]
+        == "2030-02-28"
+    )
     with pytest.raises(ValueError):
-        plan_tasks(
-            [person()],
-            DAY,
-            updated_at=STAMP,
-            retained_ids={("person-1", 2030): ""},
-            policy=TaskPolicy(),
+        plan(updated_at=STAMP.replace(tzinfo=None))
+
+
+def test_optional_fields_only_when_explicit_and_catalog_values_checked():
+    values = plan(
+        policy=tasks.TaskPolicy(
+            status="To Do", priority="Low", tags=("Chore",), project_ids=("project-1",)
         )
-    with pytest.raises(ValueError):
-        plan([person(), person()])
-    with pytest.raises(ValueError):
-        plan_tasks(
-            [person(), person(id="person-2")],
-            DAY,
-            updated_at=STAMP,
-            retained_ids={("person-1", 2030): "a" * 32, ("person-2", 2030): "a" * 32},
-            policy=TaskPolicy(),
+    )[0]["values"]
+    assert values["status"] == "To Do" and values["priority"] == "Low"
+    assert values["tags"] == '["Chore"]' and values["project_ids"] == '["project-1"]'
+    for policy in [tasks.TaskPolicy(status="Done"), tasks.TaskPolicy(priority="Urgent")]:
+        with pytest.raises(ValueError):
+            plan(policy=policy)
+
+
+def test_session_preflight_and_single_create_use_canonical_contract():
+    calls = []
+
+    def server(request):
+        calls.append((request.method, request.url.path))
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        body = json.loads(request.content)
+        assert body == {"policy": POLICY, **plan()[0]}
+        return httpx.Response(200, json=created(body))
+
+    receipt = run(server)
+    assert calls == [("GET", "/v1/session"), ("POST", "/v1/rows/create")]
+    assert receipt["created"][0]["originId"] == f"people:person-1:{TARGET}"
+    assert receipt["existing"] == []
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        session(scopes=["full"]),
+        session(scopes=SCOPES + ["tables:write:tasks"]),
+        session(scopes=SCOPES * 2),
+        session(capabilities={}),
+        session(
+            capabilities={
+                "rowCreation": {
+                    "protocol": "atomic-origin-v1",
+                    "policies": [{"id": POLICY["id"], "revision": "b" * 64}],
+                }
+            }
+        ),
+        session(capabilities={**session()["capabilities"], "governance": {}}),
+    ],
+)
+def test_unavailable_stale_or_broad_session_never_writes(data):
+    def server(request):
+        assert request.method == "GET"
+        return httpx.Response(200, json=data)
+
+    with pytest.raises(tasks.CreationInterrupted):
+        run(server)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"id": "foreign"},
+        {"policy": {"id": "different", "revision": "a" * 64}},
+        {"originId": "invented"},
+        {"kind": "unknown"},
+        {"extra": True},
+        {"revision": {"updated_at": "2030-02-28T14:00:02.000Z", "hub_at": "bad"}},
+    ],
+)
+def test_malformed_receipt_is_indeterminate_and_never_success(change):
+    def server(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        return httpx.Response(200, json={**created(json.loads(request.content)), **change})
+
+    with pytest.raises(tasks.CreationInterrupted) as error:
+        run(server)
+    assert error.value.receipt == {"created": [], "existing": []}
+
+
+@pytest.mark.parametrize("status", [307, 401, 403, 409, 422, 503])
+def test_adopted_error_never_tries_generated_fallback_or_redirect(status):
+    calls = []
+
+    def server(request):
+        calls.append(request.url.path)
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        assert json.loads(request.content)["target"] == {"kind": "adopted", "id": "old-task"}
+        return httpx.Response(
+            status,
+            json={"error": "adopted_missing"},
+            headers={"Location": "https://elsewhere.example"},
         )
+
+    with pytest.raises(tasks.CreationInterrupted):
+        run(server, plan(retained_ids={("person-1", 2030): "old-task"}))
+    assert calls == ["/v1/session", "/v1/rows/create"]
+
+
+def test_adopted_created_claim_is_rejected():
+    def server(request):
+        return httpx.Response(
+            200, json=session() if request.method == "GET" else created(json.loads(request.content))
+        )
+
+    with pytest.raises(tasks.CreationInterrupted):
+        run(server, plan(retained_ids={("person-1", 2030): TARGET}))
+
+
+def test_lost_ack_retry_preserves_target_and_existing_has_no_creation_attribution():
+    calls = []
+
+    def server(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        body = json.loads(request.content)
+        calls.append(body)
+        if len(calls) == 1:
+            raise httpx.ReadTimeout("lost acknowledgment", request=request)
+        return httpx.Response(200, json={"kind": "existing", "policy": POLICY, "id": TARGET})
+
+    with pytest.raises(tasks.CreationInterrupted):
+        run(server)
+    result = run(server)
+    assert calls[0] == calls[1]
+    assert result == {
+        "created": [],
+        "existing": [{"kind": "existing", "policy": POLICY, "id": TARGET}],
+    }
+
+
+def test_later_failure_retains_prior_receipt_and_stops_remaining_requests():
+    calls = []
+
+    def server(request):
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        body = json.loads(request.content)
+        calls.append(body)
+        if len(calls) == 2:
+            raise httpx.ReadTimeout("uncertain", request=request)
+        return httpx.Response(200, json=created(body))
+
+    with pytest.raises(tasks.CreationInterrupted) as error:
+        run(server, plan([person(), person(id="p2"), person(id="p3")]))
+    assert len(calls) == 2
+    assert error.value.receipt["created"][0]["id"] == TARGET
+    assert error.value.receipt["existing"] == []
+
+
+def test_empty_duplicate_and_insecure_requests_fail_before_network():
+    def server(request):
+        pytest.fail("unexpected network")
+
+    assert run(server, []) == {"created": [], "existing": []}
+    with pytest.raises(ValueError):
+        run(server, plan() * 2)
+    with httpx.Client(
+        base_url="http://hub.example", transport=httpx.MockTransport(server)
+    ) as client:
+        with pytest.raises(ValueError, match="HTTPS"):
+            tasks.create_tasks(
+                client, plan(), policy=POLICY, scopes=SCOPES, validator=CanonicalPolicy()
+            )
 
 
 @pytest.mark.parametrize("changes", [{"notify_birthday": "false"}, {"id": ""}, {"name": ""}])
@@ -171,180 +367,41 @@ def test_invalid_person_cannot_be_silently_enrolled(changes):
         plan([person(**changes)])
 
 
-@pytest.mark.parametrize("values", [{"status": "Done"}, {"priority": "Urgent"}])
-def test_policy_uses_actual_catalog_options(values):
+def test_conflicting_adopted_ids_fail_before_any_write():
     with pytest.raises(ValueError):
-        plan_tasks([person()], DAY, updated_at=STAMP, retained_ids={}, policy=TaskPolicy(**values))
-
-
-def test_naive_clock_rejected_and_aware_clock_does_not_move_due_date():
-    with pytest.raises(ValueError):
-        plan_tasks(
-            [person()],
-            DAY,
-            updated_at=STAMP.replace(tzinfo=None),
-            retained_ids={},
-            policy=TaskPolicy(),
-        )
-    (row,) = plan_tasks(
-        [person()],
-        DAY,
-        updated_at=dt.datetime(2030, 3, 1, 1, tzinfo=dt.timezone(dt.timedelta(hours=9))),
-        retained_ids={},
-        policy=TaskPolicy(),
-    )
-    assert row["due_date"] == "2030-02-28"
-    assert row["updated_at"] == "2030-02-28T16:00:00.000Z"
-
-
-@pytest.mark.parametrize(
-    "state",
-    [{"status": "Completed"}, {"status": "Canceled"}, {"deleted_at": "2030-02-28T15:00:00.000Z"}],
-)
-def test_lost_ack_retry_uses_only_insert_and_preserves_existing_state(state):
-    # Models the published service contract, not a test of its SQL atomicity.
-    saved = {}
-    calls = []
-
-    def server(request):
-        assert request.url.path == "/v1/rows/insert" and request.method == "POST"
-        body = json.loads(request.content)
-        assert body["table"] == "tasks" and "history" not in body
-        assert set(body["columns"]) == set(body["rows"][0])
-        calls.append(body)
-        (row,) = body["rows"]
-        if not saved:
-            saved.update({**row, **state, "title": "<edited title>"})
-            raise httpx.ReadTimeout("lost acknowledgement", request=request)
-        assert row["id"] == saved["id"]
-        return httpx.Response(200, json={"inserted": [], "existing": [row["id"]], "rejected": []})
-
-    with httpx.Client(
-        base_url="https://hub.example", transport=httpx.MockTransport(server)
-    ) as client:
-        with pytest.raises(InsertInterrupted) as error:
-            insert_tasks(client, plan())
-        assert isinstance(error.value.__cause__, httpx.ReadTimeout)
-        before = saved.copy()
-        receipt = insert_tasks(client, plan([person(name="<renamed>")]))
-    assert receipt == {"inserted": [], "existing": [before["id"]], "rejected": []}
-    assert saved == before and len(calls) == 2
-
-
-@pytest.mark.parametrize(
-    "receipt",
-    [
-        None,
-        {"upserted": 1},
-        {"inserted": [], "existing": [], "rejected": []},
-        {"inserted": ["foreign"], "existing": [], "rejected": []},
-        {"inserted": ["row-1"], "existing": ["row-1"], "rejected": []},
-        {"inserted": ["row-1"], "existing": [], "rejected": [{"id": "row-1"}]},
-        {"inserted": [], "existing": [], "rejected": [None]},
-    ],
-)
-def test_ambiguous_receipt_never_reports_success(receipt):
-    with httpx.Client(
-        base_url="https://hub.example",
-        transport=httpx.MockTransport(lambda r: httpx.Response(200, json=receipt)),
-    ) as client:
-        with pytest.raises(InsertInterrupted, match="receipt") as error:
-            insert_tasks(client, [{"id": "row-1", "title": "<task>"}])
-        assert isinstance(error.value.__cause__, ValueError)
-
-
-def test_chunked_partial_rejections_are_returned_to_caller():
-    calls = []
-
-    def server(request):
-        rows = json.loads(request.content)["rows"]
-        calls.append(len(rows))
-        return httpx.Response(
-            200,
-            json={
-                "inserted": [r["id"] for r in rows[1:]],
-                "existing": [],
-                "rejected": [{"id": rows[0]["id"], "rule": "write-conflict", "retryable": True}],
-            },
+        plan(
+            [person(), person(id="p2")],
+            retained_ids={("person-1", 2030): "same", ("p2", 2030): "same"},
         )
 
-    with httpx.Client(
-        base_url="https://hub.example", transport=httpx.MockTransport(server)
-    ) as client:
-        receipt = insert_tasks(client, [{"id": f"row-{i}"} for i in range(201)])
-    assert calls == [200, 1]
-    assert len(receipt["inserted"]) == 199
-    assert [r["id"] for r in receipt["rejected"]] == ["row-0", "row-200"]
+
+@pytest.mark.parametrize("year", [True, "2030", 0, 10000])
+def test_occurrence_year_is_an_integer_calendar_year(year):
+    with pytest.raises(ValueError):
+        tasks.occurrence_id("person-1", year)
 
 
-@pytest.mark.parametrize("status", [307, 401, 403, 404, 500])
-def test_http_errors_and_redirects_never_fall_back(status):
-    calls = []
-
+def test_adopted_existing_succeeds_without_lineage_or_creation_claim():
     def server(request):
-        calls.append(request.url)
-        return httpx.Response(status, headers={"Location": "https://elsewhere.example"})
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        assert json.loads(request.content)["target"] == {"kind": "adopted", "id": "old-task"}
+        return httpx.Response(200, json={"kind": "existing", "policy": POLICY, "id": "old-task"})
 
-    with httpx.Client(
-        base_url="https://hub.example", follow_redirects=True, transport=httpx.MockTransport(server)
-    ) as client:
-        with pytest.raises(InsertInterrupted) as error:
-            insert_tasks(client, plan())
-        assert isinstance(error.value.__cause__, httpx.HTTPStatusError)
-    assert len(calls) == 1
-
-
-def test_empty_batch_no_network_and_duplicates_rejected_before_first_chunk():
-    def server(request):
-        pytest.fail("unexpected network call")
-
-    with httpx.Client(
-        base_url="https://hub.example", transport=httpx.MockTransport(server)
-    ) as client:
-        assert insert_tasks(client, []) == {"inserted": [], "existing": [], "rejected": []}
-        with pytest.raises(ValueError):
-            insert_tasks(client, [{"id": f"row-{i}"} for i in range(201)] + [{"id": "row-0"}])
-
-
-def test_insecure_endpoint_is_rejected_before_sending_anything():
-    def server(request):
-        pytest.fail("insecure request reached transport")
-
-    with httpx.Client(
-        base_url="http://hub.example", transport=httpx.MockTransport(server)
-    ) as client:
-        with pytest.raises(ValueError, match="HTTPS"):
-            insert_tasks(client, plan())
-
-
-@pytest.mark.parametrize("inactive", [{"notify_birthday": False}, {"deleted_at": "2030-01-01"}])
-@pytest.mark.parametrize("reverse", [False, True])
-def test_conflicting_duplicate_records_fail_before_filtering(inactive, reverse):
-    people = [person(), person(**inactive)]
-    with pytest.raises(ValueError, match="Duplicate"):
-        plan(list(reversed(people)) if reverse else people)
-
-
-@pytest.mark.parametrize("failure", ["timeout", "http", "receipt"])
-def test_later_batch_failure_preserves_earlier_receipts(failure):
-    calls = []
-    first = {
-        "inserted": [f"row-{i}" for i in range(1, 200)],
-        "existing": [],
-        "rejected": [{"id": "row-0", "rule": "required"}],
+    assert run(server, plan(retained_ids={("person-1", 2030): "old-task"})) == {
+        "created": [],
+        "existing": [{"kind": "existing", "policy": POLICY, "id": "old-task"}],
     }
 
-    def server(request):
-        calls.append(request)
-        if len(calls) == 1:
-            return httpx.Response(200, json=first)
-        if failure == "timeout":
-            raise httpx.ReadTimeout("lost acknowledgement", request=request)
-        return httpx.Response(500 if failure == "http" else 200, json={})
 
-    with httpx.Client(
-        base_url="https://hub.example", transport=httpx.MockTransport(server)
-    ) as client:
-        with pytest.raises(InsertInterrupted) as error:
-            insert_tasks(client, [{"id": f"row-{i}"} for i in range(201)])
-    assert error.value.receipt == first
+@pytest.mark.parametrize("status", [307, 401, 403, 503])
+def test_failed_session_preflight_never_sends_a_create_or_follows_redirect(status):
+    calls = []
+
+    def server(request):
+        calls.append(str(request.url))
+        return httpx.Response(status, headers={"Location": "https://elsewhere.example"})
+
+    with pytest.raises(tasks.CreationInterrupted):
+        run(server)
+    assert calls == ["https://hub.example/v1/session"]

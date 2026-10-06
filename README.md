@@ -50,10 +50,12 @@ changes take effect after a successful sync, not instantly in the background.
 
 **Life Data Tasks has a published schema; daily task creation is not active.**
 The tested adapter in `src/core/life_tasks.py` plans opted-in birthday tasks and
-uses the supported atomic `/v1/rows/insert` route. Existing, completed, canceled
+uses the policy-bound `/v1/rows/create` route for an atomic task and origin.
+Existing, completed, canceled
 and tombstoned rows are preserved by that service contract. Retries reuse the
 same person/year ID even after a rename or credential change. Retained historical
-occurrence mappings take precedence over generated IDs.
+occurrence mappings take precedence over generated IDs, using explicit adopted
+intent. A missing adopted target fails instead of creating a replacement.
 
 The adapter writes a date-only `due_date`, JSON-array `person_ids` and optional
 `project_ids`, plus a separate UTC millisecond edit timestamp. Status, priority,
@@ -63,9 +65,16 @@ namespace and UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`.
 Person IDs are not trimmed, case-folded or Unicode-normalized.
 
 Conflicting duplicate People records fail planning before opt-in filtering.
-HTTP or receipt failures raise `InsertInterrupted` with earlier validated
-batch receipts and the original cause, so prior rejections remain available.
-Replaying the same IDs is safe after a lost acknowledgement.
+Missing birthdays are skipped without inventing dates. HTTP or receipt failures
+raise `CreationInterrupted` with earlier validated receipts and the original
+cause. The adapter stops and never retries automatically. A caller may replay
+identical intent after a lost acknowledgement; an `existing` receipt establishes
+presence only and never claims that this caller created the row.
+
+The host must supply Life Core's canonical validator through the injected
+boundary; no handwritten fallback exists. The [policy test provenance](docs/creation-policy.md)
+describes the test-only JS bundle. Production awaits Core's pure-Python boundary
+and separately verified configured policy and credential receipts.
 
 Before connecting the daily cron, establish narrow caller enrollment, complete
 People reads, historical dedupe coverage, the service's lineage contract, and
