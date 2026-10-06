@@ -11,14 +11,14 @@ per-phone mutes, and lets you choose a reminder time and timezone. It stores
 its connection in Keychain and a complete birthday snapshot in Application
 Support. Failed syncs retain the previous snapshot.
 
-Enrollment is being updated to **Life Data URL + browser approval**. No manual
-credential copying is required or offered by the new connection screen. This
-version keeps approval unavailable until Life Core publishes its narrow
-birthday profile. The existing full-access device approval route must not be
-used as a fallback. The separately installed older release may still show its
-credential field; do not use that field to provision a broader token.
+Connect with your **Life Data URL**, then choose **Continue in browser** and
+open the approval link. Review the birthday-only read grants and approve in
+your browser; return to the app while it finishes connecting. No token copying
+is required. The app uses the service-owned `birthday-reminders-reader-v1`
+profile and rejects broader grants. An unsupported hub cannot fall back to
+full-access enrollment.
 
-The prepared client generates its own random candidate credential, places only
+The client generates its own random candidate credential, places only
 its SHA-256 fingerprint/code in the canonical approval link, and checks for
 approval with a bounded session request. It saves only the approved identity
 and profile to device-only Keychain. Cancel, replacement or expiry invalidate

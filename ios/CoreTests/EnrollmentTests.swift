@@ -218,6 +218,26 @@ import XCTest
     XCTAssertTrue(model.cleanupMessage!.contains("not confirmed"))
   }
 
+  func testCleanupStaysPendingAcrossRepeatedCancelUntilReceipt() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var pending: CheckedContinuation<EnrollmentReply, Never>?
+    let started = expectation(description: "cleanup started")
+    let model = EnrollmentSession(contract: contract, candidate: { candidate },
+      request: { _, _, revoke, _ in
+        if revoke { return await withCheckedContinuation { pending = $0; started.fulfill() } }
+        return self.approved(candidate)
+      }, install: { _, _, _, _, _ in false })
+    let work = Task { await model.start(endpoint: "https://hub.example") }
+    await fulfillment(of: [started], timeout: 3)
+    XCTAssertTrue(model.isCleaningUp)
+    await model.cancel()
+    XCTAssertTrue(model.isCleaningUp)
+    pending?.resume(returning: .init(status: 401))
+    await work.value
+    XCTAssertFalse(model.isCleaningUp)
+    XCTAssertTrue(model.cleanupMessage?.contains("not confirmed") == true)
+  }
+
   func testNumericLogoutDoesNotConfirmRevocation() async {
     let candidate = EnrollmentCandidate(token: "lt_synthetic")
     let model = EnrollmentSession(contract: contract, candidate: { candidate },

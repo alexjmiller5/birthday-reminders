@@ -74,7 +74,7 @@ struct ConnectionView: View {
       } message: {
         Text(enrollment?.cleanupMessage ?? "")
       }
-      .interactiveDismissDisabled(waiting)
+      .interactiveDismissDisabled(waiting || enrollment?.cleanupMessage != nil)
       .task {
         guard enrollment == nil else { return }
         do {

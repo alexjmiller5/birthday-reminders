@@ -22,8 +22,8 @@ Changing it or pushing main can affect the live service.
   `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
   bounded polling and generation/deadline fencing. `CoreEnrollmentPolicy` runs
   the pinned canonical policy resource; provenance is in `docs/enrollment-policy.md`.
-  Production must keep `EnrollmentContract` absent until the service confirms
-  deployment and configuration of its exact narrow profile. Never substitute Life UI's full-replica `/login` contract.
+  Production uses configured profile `birthday-reminders-reader-v1` with exactly
+  the five People read-column grants declared in `ConnectionView`. Never substitute Life UI's full-replica `/login` contract.
 - Credentials belong in this app's device-only Keychain, never the bundle,
   defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
   phone People read and Tasks writer use separate identities. Candidate cleanup
@@ -40,7 +40,8 @@ Changing it or pushing main can affect the live service.
   back to writing Notion from the native app.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
-  Enforced birthday-field reads and create-only Tasks enrollment remain pending.
+  Birthday-field read enrollment is configured. Create-only Tasks enrollment
+  remains pending.
   No live consumer credential is bundled or provisioned; no broad fallback.
 - Personal Ad Hoc delivery uses `.github/workflows/build-ios.yml`, manual only.
   `scripts/sign-ios.py` verifies profile, identity and export in a disposable

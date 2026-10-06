@@ -3,9 +3,14 @@
 The bundled `ios/Core/Resources/life-enrollment.js` is the minimal IIFE supplied
 by Life Core, with no local policy edits. It exports the public enrollment
 functions only. `CoreEnrollmentPolicy` loads it into JavaScriptCore and passes
-JSON across the realm boundary. Production enrollment remains absent until the
-service supplies its configured profile receipt; synthetic tests inject their
-own expected profile.
+JSON across the realm boundary. Production uses the configured `birthday-reminders-reader-v1` profile with
+exact read grants for People id/name/birthday/notify_birthday/deleted_at.
+Synthetic tests inject their own expected profile. Core confirmed deployment
+37540666572 and configured secret deployment
+`0641ef7d-c624-4f8d-95fe-71ec1f2aaf90`; the initial profile revision is
+`885bd8e129c1b131a1c0d668db4a5de8317fd29f6b9d54286ce8534505d400b2`.
+The canonical validator checks exact grants and a valid revision; accepted
+receipts retain the actual revision in device-only Keychain.
 
 Provenance:
 

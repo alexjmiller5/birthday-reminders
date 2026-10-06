@@ -18,7 +18,7 @@ public struct EnrollmentCandidate: Sendable {
 }
 
 /// The service's canonical profile binding supplies both operations together.
-/// No production binding exists until Life Core publishes narrow enrollment.
+/// Only the configured birthday reader profile may be used in production.
 /// In particular, do not bind this to the legacy full-scope /login operation.
 public struct EnrollmentContract {
   public let approvalPath: (String) async throws -> String
