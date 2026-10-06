@@ -61,6 +61,11 @@ Files: `ios/project.yml`, `ios/justfile`, `ios/App/*`, `ios/AppTests/*`.
 - [ ] Verify allowed consumer token scopes, enroll the app and sync real birthdays.
 - [ ] Once tasks exists, read its catalog and implement/test the daily insert-only
   task writer, including a retry after a lost response and completed-task reuse.
+- [x] Read the published Tasks schema. Implement an inactive pure planner and
+  `/v1/rows/insert` adapter in `src/core/life_tasks.py`; test exact UUIDv5 vectors,
+  retained-ID adoption, opt-ins, dates, explicit policy, retry preservation,
+  chunking, rejected/malformed receipts and redirect refusal in
+  `tests/test_life_tasks.py`. Keep enrollment and daily activation gated.
 - [ ] Sign/install on the phone and observe the test notification with app closed.
 - [ ] Update README and AGENTS, commit all changes, push an authorized branch,
   verify CI, and retire the old notification pipeline after replacement approval.

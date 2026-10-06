@@ -18,8 +18,10 @@ soft-deletion fields follow Life Data's standard API contract. Birthdays may
 be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. Edit people and opt-ins
 in Life Data; local mute controls affect this phone only.
 
-The current Life Data `tables:read` scope permits dataset-wide reads, not
-only birthdays. Review that access before issuing a credential. The native
+Life Data supports exact-table grants, but these permit whole-table access;
+requesting fewer columns is not an authorization boundary. Enrollment is
+waiting for enforced birthday-column reads and a separate create-only Tasks
+credential for the daily writer. No broader credential is provisioned. The native
 app sends no record writes, has no analytics, and never receives infrastructure
 credentials. On a replacement phone, install and connect again; Keychain
 credentials are device-only. Disconnect removes saved connection, cache and
@@ -38,9 +40,31 @@ when to reopen it to renew coverage; it syncs and reschedules on foreground.
 Already scheduled notifications work offline with the app closed. Source
 changes take effect after a successful sync, not instantly in the background.
 
-**Life Data task creation is pending its tasks-table contract.** The native
-app does not create Notion tasks as a fallback. A server-side task writer is
-required for daily creation independently of whether the phone app opens.
+**Life Data Tasks has a published schema; daily task creation is not active.**
+The tested adapter in `src/core/life_tasks.py` plans opted-in birthday tasks and
+uses the supported atomic `/v1/rows/insert` route. Existing, completed, canceled
+and tombstoned rows are preserved by that service contract. Retries reuse the
+same person/year ID even after a rename or credential change. Retained historical
+occurrence mappings take precedence over generated IDs.
+
+The adapter writes a date-only `due_date`, JSON-array `person_ids` and optional
+`project_ids`, plus a separate UTC millisecond edit timestamp. Status, priority,
+tags and projects are omitted unless explicitly configured; schema options do
+not choose a user's creation policy. Identity uses UUIDv5 with the fixed app
+namespace and UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`.
+Person IDs are not trimmed, case-folded or Unicode-normalized.
+
+Conflicting duplicate People records fail planning before opt-in filtering.
+HTTP or receipt failures raise `InsertInterrupted` with earlier validated
+batch receipts and the original cause, so prior rejections remain available.
+Replaying the same IDs is safe after a lost acknowledgement.
+
+Before connecting the daily cron, establish narrow caller enrollment, complete
+People reads, historical dedupe coverage, the service's lineage contract, and
+reviewed opt-ins and creation policy. Mock transport tests verify the adapter's
+retry and receipt handling, not the service's database atomicity or live access.
+The native app does not create tasks as a Notion fallback; phone background
+execution is not responsible for the daily writer.
 
 ## Development and installation
 
