@@ -2,7 +2,7 @@ name: Native app checks
 
 on:
   push:
-    branches: [native-ios]
+    branches: [main, native-ios]
   pull_request:
     paths: ['ios/**', 'Package.swift', '.github/workflows/*.yml', 'scripts/sign*', 'scripts/ios_workflow_test.py']
 

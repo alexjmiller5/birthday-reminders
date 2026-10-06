@@ -25,7 +25,7 @@ jobs:
           python3 scripts/sign_ios_test.py
           python3 scripts/ios_workflow_test.py
       - name: Load signing material
-        uses: 1password/load-secrets-action@v2
+        uses: 1password/load-secrets-action@v5
         with:
           export-env: true
         env:
