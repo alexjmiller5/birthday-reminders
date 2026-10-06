@@ -20,10 +20,12 @@ struct ConnectionView: View {
           Text("Enter your Life Data address, then approve Birthday Reminders in your browser. This phone keeps its connection securely in Keychain.")
             .foregroundStyle(.secondary)
         }
-        Section("Connection") {
+        Section {
           TextField("Life Data URL", text: $endpoint).keyboardType(.URL)
             .textInputAutocapitalization(.never).autocorrectionDisabled()
             .disabled(waiting)
+        } header: {
+          Text("Connection")
         } footer: {
           Text("This app requests birthday-only read access. Your opt-in choices stay in Life Data.")
         }
