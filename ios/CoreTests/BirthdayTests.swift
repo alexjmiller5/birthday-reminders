@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import BirthdayCore
+@testable import BirthdaysCore
 
 final class BirthdayTests: XCTestCase {
   private func date(_ value: String) -> Date { ISO8601DateFormatter().date(from: value)! }

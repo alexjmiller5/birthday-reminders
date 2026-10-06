@@ -1,4 +1,4 @@
-# Birthday Reminders
+# Birthdays
 
 Native iPhone birthday reminders backed by Life Data, with notifications
 scheduled on the phone. The Python service in this repository is a separate
@@ -14,7 +14,7 @@ Support. Failed syncs retain the previous snapshot.
 Connect with your **Life Data URL**, then choose **Continue in browser** and
 open the approval link. Review the birthday-only read grants and approve in
 your browser; return to the app while it finishes connecting. No token copying
-is required. The app uses the service-owned `birthday-reminders-reader-v1`
+is required. The app uses the service-owned `birthdays-reader-v1`
 profile and rejects broader grants. An unsupported hub cannot fall back to
 full-access enrollment.
 
@@ -80,7 +80,7 @@ Requires Xcode and XcodeGen. The bundled [Life Core enrollment policy](docs/enro
 runs in the system JavaScriptCore framework; no replica runtime is included.
 
 ```sh
-swift test --scratch-path /tmp/birthday-reminders-swift-build
+swift test --scratch-path /tmp/birthdays-swift-build
 just -f ios/justfile check
 just -f ios/justfile test
 just -f ios/justfile run
@@ -101,7 +101,7 @@ Generate a temporary age identity locally (`age-keygen -o <private-path>`),
 then dispatch with its public recipient as `artifact_recipient`. Keep the
 private identity local. After CI passes, download the encrypted artifact within
 one day, decrypt it locally, verify the IPA SHA256 against the workflow log,
-and put it at `ios/build/BirthdayReminders.ipa`. Never upload a plaintext IPA.
+and put it at `ios/build/Birthdays.ipa`. Never upload a plaintext IPA.
 Remove the temporary identity after decryption and the transfer copies after
 installation. Workflow dispatch requires the workflow to exist on the default
 branch; merging this PR also triggers the existing service deploy and needs
@@ -111,7 +111,7 @@ Install the verified artifact without rebuilding:
 
 ```sh
 IOS_INSTALL_HOST=<paired-mac> IOS_DEVICE_ID=<enrolled-device> \
-  just -f ios/justfile _install build/BirthdayReminders.ipa
+  just -f ios/justfile _install build/Birthdays.ipa
 ```
 
 Local Debug builds require native developer enrollment, accessible signing,
@@ -137,7 +137,7 @@ verified and the service change is authorized.
 
 `.env.tpl` is the canonical manifest - op:// references into the project's
 1Password vault only. All five runtime fields live in its single
-`Birthday Reminders ENV` item:
+`Birthdays ENV` item:
 
 - `NOTION_API_KEY` - this app's own Notion integration with Read and Insert
   content capabilities, access to the People and Tasks databases, and access
@@ -157,7 +157,7 @@ pushes to the Modal secret store.
 ## Manual setup
 
 Run bootstrap with your repository name. This repo's `.env.tpl` uses the
-vault name `Birthday Reminders`:
+vault name `Birthdays`:
 
 ```bash
 op-project-bootstrap .env.tpl --repo <owner>/<repo>
@@ -170,7 +170,7 @@ account. Fill the environment fields with this project's own credentials.
 `scripts/provision.py` emits a Modal approval URL and verification code on
 stderr. Open that URL in the configured remote browser session (agents use
 chrome-control) and approve the code. It verifies the new token pair in
-memory; bootstrap saves both fields to `Birthday Reminders CI Modal Token`
+memory; bootstrap saves both fields to `Birthdays CI Modal Token`
 at once through JSON stdin. It never opens a local browser or writes a
 provider config or temporary credential file.
 

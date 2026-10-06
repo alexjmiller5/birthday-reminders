@@ -1,4 +1,4 @@
-# Native Birthday Reminders Implementation Plan
+# Native Birthdays Implementation Plan
 
 > **For agentic workers:** Use superpowers:executing-plans to implement this plan task-by-task.
 

@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-  name: "BirthdayCore",
+  name: "BirthdaysCore",
   platforms: [.iOS(.v17), .macOS(.v14)],
-  products: [.library(name: "BirthdayCore", targets: ["BirthdayCore"])],
+  products: [.library(name: "BirthdaysCore", targets: ["BirthdaysCore"])],
   targets: [
-    .target(name: "BirthdayCore", path: "ios/Core", resources: [.copy("Resources/life-enrollment.js")]),
-    .testTarget(name: "BirthdayCoreTests", dependencies: ["BirthdayCore"], path: "ios/CoreTests"),
+    .target(name: "BirthdaysCore", path: "ios/Core", resources: [.copy("Resources/life-enrollment.js")]),
+    .testTarget(name: "BirthdaysCoreTests", dependencies: ["BirthdaysCore"], path: "ios/CoreTests"),
   ]
 )

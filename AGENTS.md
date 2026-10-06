@@ -2,7 +2,7 @@
 
 The native iOS app lives in `ios/`. It reads birthdays through Life Data's
 supported API and schedules its own local notifications. `Package.swift`
-exposes `BirthdayCore` for fast macOS tests. Its enrollment policy bundles
+exposes `BirthdaysCore` for fast macOS tests. Its enrollment policy bundles
 the reviewed Life Core public entry into the system JavaScriptCore framework.
 
 The Python service in `app.py` remains a separately deployed daily Modal
@@ -11,18 +11,22 @@ Changing it or pushing main can affect the live service.
 
 ## Native app
 
+The shipped bundle ID is `com.alexmiller.birthday-reminders`. Keep it stable
+for installed identity and Keychain continuity. Task occurrence IDs and their
+application namespace are stable across display-name changes.
+
 - `ios/project.yml` owns the generated Xcode project; never edit `.xcodeproj`.
 - `ios/Core/`: date validation, reminder planning, paginated Life Data reads,
   atomic snapshot cache and notification reconciliation. No SwiftUI imports.
 - `ios/App/`: SwiftUI, Keychain, UserNotifications, application lifecycle.
-- Run `swift test --scratch-path /tmp/birthday-reminders-swift-build` for core
+- Run `swift test --scratch-path /tmp/birthdays-swift-build` for core
   tests, `just -f ios/justfile test` for Keychain/model/UI tests, and
   `just -f ios/justfile run` for the simulator. Derived data stays outside iCloud.
 - Enrollment UX is URL plus explicit browser approval, never manual token entry.
   `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
   bounded polling and generation/deadline fencing. `CoreEnrollmentPolicy` runs
   the pinned canonical policy resource; provenance is in `docs/enrollment-policy.md`.
-  Production uses configured profile `birthday-reminders-reader-v1` with exactly
+  Production uses configured profile `birthdays-reader-v1` with exactly
   the five People read-column grants declared in `ConnectionView`. Never substitute Life UI's full-replica `/login` contract.
 - Credentials belong in this app's device-only Keychain, never the bundle,
   defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
@@ -112,14 +116,14 @@ vault. The operator opens the stderr approval URL in the configured remote
 browser session (agents use chrome-control) and approves its code. Do not
 use `modal token new` or write a temporary credential config.
 
-Birthday Reminders owns its Modal app, runtime Secret, daily schedule, and
+Birthdays owns its Modal app, runtime Secret, daily schedule, and
 independently minted CI token. The CI token is stored only in its project
 vault. Modal Starter personal tokens retain workspace-level permissions;
 this accepted provider limitation allows independent rotation but does not
 enforce access to just this app. Environment-scoped service users require
 [Team or Enterprise](https://modal.com/docs/guide/service-users).
 
-All runtime variables come from `Birthday Reminders ENV`; `.env.tpl`
+All runtime variables come from `Birthdays ENV`; `.env.tpl`
 references its five env-named fields. The separate CI Modal item never
 reaches the runtime. The app's own Notion integration has Read and Insert
 content capabilities for People, Tasks, and its specific project page;

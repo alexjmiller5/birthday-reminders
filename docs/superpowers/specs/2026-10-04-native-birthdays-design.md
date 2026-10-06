@@ -1,4 +1,4 @@
-# Native Birthday Reminders
+# Native Birthdays
 
 The product is an iOS 17+ SwiftUI app using Life Data for birthdays and,
 when its catalog contract exists, reminder tasks. The existing Notion/ntfy

@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import BirthdayCore
+@testable import BirthdaysCore
 
 final class StubProtocol: URLProtocol {
   static var handler: ((URLRequest) throws -> (Int, String))!

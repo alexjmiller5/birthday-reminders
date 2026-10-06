@@ -7,7 +7,7 @@ only maps that logic onto Modal: image, secrets, schedules.
 
 import modal
 
-APP_NAME = "birthday-reminders"  # also the Modal secret name (see justfile sync-secrets)
+APP_NAME = "birthdays"  # also the Modal secret name (see justfile sync-secrets)
 
 app = modal.App(APP_NAME)
 

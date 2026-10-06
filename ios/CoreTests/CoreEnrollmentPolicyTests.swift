@@ -1,5 +1,5 @@
 import XCTest
-@testable import BirthdayCore
+@testable import BirthdaysCore
 
 @MainActor final class CoreEnrollmentPolicyTests: XCTestCase {
   private let fingerprint = String(repeating: "b", count: 64)
@@ -10,6 +10,22 @@ import XCTest
     ["name": "device:" + fingerprint, "scopes": scopes,
      "enrollmentProfile": ["id": "fixture-birthday", "revision": revision],
      "capabilities": ["row_api": "v1", "schema": "none", "replica_sync": false]]
+  }
+
+  func testRenamedProductionProfileRejectsRetiredProfileReceipt() async throws {
+    let grants = ["tables:read:people:birthday", "tables:read:people:deleted_at", "tables:read:people:id",
+                  "tables:read:people:name", "tables:read:people:notify_birthday"]
+    let policy = try CoreEnrollmentPolicy(profileID: "birthdays-reader-v1", scopes: grants)
+    let path = try await policy.contract.approvalPath(fingerprint)
+    XCTAssertTrue(path.contains("profile=birthdays-reader-v1"))
+    var value = session
+    value["scopes"] = grants
+    value["enrollmentProfile"] = ["id": "birthday-reminders-reader-v1", "revision": revision]
+    do { _ = try await policy.contract.validate(value); XCTFail("Retired profile accepted") }
+    catch {}
+    value["enrollmentProfile"] = ["id": "birthdays-reader-v1", "revision": revision]
+    let receipt = try await policy.contract.validate(value)
+    XCTAssertEqual(receipt.id, "birthdays-reader-v1")
   }
 
   func testCanonicalApprovalAndProfileReceiptThroughJavaScriptCore() async throws {

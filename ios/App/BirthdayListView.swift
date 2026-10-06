@@ -1,4 +1,4 @@
-import BirthdayCore
+import BirthdaysCore
 import SwiftUI
 import UserNotifications
 

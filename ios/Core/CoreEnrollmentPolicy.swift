@@ -46,7 +46,7 @@ import JavaScriptCore
 
   private func approval(_ fingerprint: String) throws -> String {
     let result = try call("approval", ["fingerprint": fingerprint,
-      "name": "Birthday Reminders", "profile": profile["id"]!])
+      "name": "Birthdays", "profile": profile["id"]!])
     guard let path = result["path"] as? String else { throw invalidResponse() }
     return path
   }

@@ -1,4 +1,4 @@
-import BirthdayCore
+import BirthdaysCore
 import Foundation
 import UserNotifications
 
@@ -31,7 +31,7 @@ struct LocalNotifications: NotificationStore {
   }
   func sendTest() async throws {
     let content = UNMutableNotificationContent()
-    content.title = "Birthday Reminders"
+    content.title = "Birthdays"
     content.body = "Your phone is ready for birthday reminders."
     content.sound = .default
     try await center.add(

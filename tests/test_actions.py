@@ -80,7 +80,7 @@ def test_create_task_happy_path(mocker):
     assert props["Due Date"] == {"date": {"start": "2026-07-06"}}
     assert props["Project"] == {"relation": [{"id": PROJECT_PAGE_ID}]}
     assert props["Notes"] == {
-        "rich_text": [{"text": {"content": "Auto-created by birthday-reminders"}}]
+        "rich_text": [{"text": {"content": "Auto-created by birthdays"}}]
     }
     assert create_call.kwargs["headers"]["Authorization"] == "Bearer k"
     assert create_call.kwargs["headers"]["Notion-Version"] == "2026-03-11"

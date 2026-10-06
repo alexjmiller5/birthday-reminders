@@ -29,15 +29,15 @@ jobs:
       - name: Build for iPhone simulator
         working-directory: ios
         run: >-
-          xcodebuild -project BirthdayReminders.xcodeproj
-          -scheme BirthdayReminders -destination 'generic/platform=iOS Simulator'
+          xcodebuild -project Birthdays.xcodeproj
+          -scheme Birthdays -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/birthday-ios"
           CODE_SIGNING_ALLOWED=NO build
       - name: Test connection storage and onboarding on simulator
         working-directory: ios
         run: |
           IOS_TEST_DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for k,vs in d["devices"].items() if "iOS" in k for v in vs if v["name"].startswith("iPhone")))')
-          xcodebuild -project BirthdayReminders.xcodeproj -scheme BirthdayReminders \
+          xcodebuild -project Birthdays.xcodeproj -scheme Birthdays \
             -destination "platform=iOS Simulator,id=$IOS_TEST_DEVICE" \
             -derivedDataPath "$RUNNER_TEMP/birthday-ios-tests" \
             CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES \

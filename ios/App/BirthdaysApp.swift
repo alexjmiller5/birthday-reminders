@@ -1,7 +1,7 @@
 import SwiftUI
 
 @main
-struct BirthdayRemindersApp: App {
+struct BirthdaysApp: App {
   @State private var model = BirthdayModel()
   @Environment(\.scenePhase) private var scenePhase
   var body: some Scene {

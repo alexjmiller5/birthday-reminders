@@ -1,4 +1,4 @@
-import BirthdayCore
+import BirthdaysCore
 import SwiftUI
 
 struct ConnectionView: View {
@@ -18,7 +18,7 @@ struct ConnectionView: View {
       Form {
         Section {
           Text("Connect your birthdays").font(.title2.bold())
-          Text("Enter your Life Data address, then approve Birthday Reminders in your browser. This phone keeps its connection securely in Keychain.")
+          Text("Enter your Life Data address, then approve Birthdays in your browser. This phone keeps its connection securely in Keychain.")
             .foregroundStyle(.secondary)
         }
         Section {
@@ -79,7 +79,7 @@ struct ConnectionView: View {
         guard enrollment == nil else { return }
         do {
           // Public service-owned profile, separate from the server Tasks writer.
-          let policy = try CoreEnrollmentPolicy(profileID: "birthday-reminders-reader-v1", scopes: [
+          let policy = try CoreEnrollmentPolicy(profileID: "birthdays-reader-v1", scopes: [
             "tables:read:people:birthday", "tables:read:people:deleted_at", "tables:read:people:id",
             "tables:read:people:name", "tables:read:people:notify_birthday",
           ])

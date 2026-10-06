@@ -1,4 +1,4 @@
-import BirthdayCore
+import BirthdaysCore
 import Foundation
 import Observation
 import UserNotifications

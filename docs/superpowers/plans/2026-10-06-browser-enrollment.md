@@ -1,6 +1,6 @@
 # Browser Enrollment
 
-**Goal:** Enter a Life Data URL, approve Birthday Reminders through a browser
+**Goal:** Enter a Life Data URL, approve Birthdays through a browser
 link, and keep the app's own narrowly scoped credential in device-only Keychain.
 No manual token entry or provider/operator credentials.
 
@@ -13,7 +13,7 @@ receipt. Self-revocation is POST `/v1/session`, confirmed only by
 `{logged_out:true}`. A 401 is not revocation proof.
 
 Life UI's replica eligibility and legacy full-scope `/login` approval are not
-Birthday Reminders authority. Core owns the profile-bound approval
+Birthdays authority. Core owns the profile-bound approval
 path, canonical session validator and enforced People projection. The phone
 needs only id/name/birthday/notify_birthday/deleted_at; the server Tasks writer
 is a separate caller. Core has confirmed its deployed profile configuration. The app uses the exact

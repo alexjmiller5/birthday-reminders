@@ -1,5 +1,5 @@
 import XCTest
-@testable import BirthdayCore
+@testable import BirthdaysCore
 
 @MainActor final class EnrollmentTests: XCTestCase {
   private var contract: EnrollmentContract {
