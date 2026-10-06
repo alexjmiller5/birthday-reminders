@@ -48,13 +48,14 @@ when to reopen it to renew coverage; it syncs and reschedules on foreground.
 Already scheduled notifications work offline with the app closed. Source
 changes take effect after a successful sync, not instantly in the background.
 
-**Life Data task creation is pending its tasks-table contract.** The native
+**Life Data task creation is inactive pending restricted writer authority and migration dedupe coverage.** Tasks and Projects schemas are published. The native
 app does not create Notion tasks as a fallback. A server-side task writer is
 required for daily creation independently of whether the phone app opens.
 
 ## Development and installation
 
-Requires Xcode and XcodeGen. No third-party runtime dependencies.
+Requires Xcode and XcodeGen. The bundled [Life Core enrollment policy](docs/enrollment-policy.md)
+runs in the system JavaScriptCore framework; no replica runtime is included.
 
 ```sh
 swift test --scratch-path /tmp/birthday-reminders-swift-build

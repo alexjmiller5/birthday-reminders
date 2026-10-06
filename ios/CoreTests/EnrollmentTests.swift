@@ -217,6 +217,17 @@ import XCTest
     XCTAssertTrue(model.cleanupMessage!.contains("not confirmed"))
   }
 
+  func testNumericLogoutDoesNotConfirmRevocation() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    let model = EnrollmentSession(contract: contract, candidate: { candidate },
+      request: { _, _, revoke, _ in
+        if revoke { return .init(status: 200, data: Data(#"{"logged_out":1}"#.utf8)) }
+        return self.approved(candidate)
+      }, install: { _, _, _, _, _ in false })
+    await model.start(endpoint: "https://hub.example")
+    XCTAssertTrue(model.cleanupMessage?.contains("not confirmed") == true)
+  }
+
   func testCancelAfterCommitDoesNotRevokeAcceptedConnection() async {
     let candidate = EnrollmentCandidate(token: "lt_synthetic")
     var model: EnrollmentSession!

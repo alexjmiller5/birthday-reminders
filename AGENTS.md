@@ -2,7 +2,8 @@
 
 The native iOS app lives in `ios/`. It reads birthdays through Life Data's
 supported API and schedules its own local notifications. `Package.swift`
-exposes the dependency-free `BirthdayCore` library for fast macOS tests.
+exposes `BirthdayCore` for fast macOS tests. Its enrollment policy bundles
+the reviewed Life Core public entry into the system JavaScriptCore framework.
 
 The Python service in `app.py` remains a separately deployed daily Modal
 cron (9am America/New_York), currently reading Notion and sending ntfy.
@@ -19,9 +20,10 @@ Changing it or pushing main can affect the live service.
   `just -f ios/justfile run` for the simulator. Derived data stays outside iCloud.
 - Enrollment UX is URL plus explicit browser approval, never manual token entry.
   `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
-  bounded polling and generation/deadline fencing. The canonical narrow-profile
-  binding is pending; production must keep `EnrollmentContract` absent until
-  published. Never substitute Life UI's full-replica `/login` contract.
+  bounded polling and generation/deadline fencing. `CoreEnrollmentPolicy` runs
+  the pinned canonical policy resource; provenance is in `docs/enrollment-policy.md`.
+  Production must keep `EnrollmentContract` absent until the service confirms
+  deployment and configuration of its exact narrow profile. Never substitute Life UI's full-replica `/login` contract.
 - Credentials belong in this app's device-only Keychain, never the bundle,
   defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
   phone People read and Tasks writer use separate identities. Candidate cleanup
@@ -33,8 +35,8 @@ Changing it or pushing main can affect the live service.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
-- Life Data task creation is not implemented. Implement against its actual
-  published catalog contract; never create provisional task tables or fall
+- Life Data task creation is not active. Tasks and Projects schemas are published;
+  integrate only against that actual catalog contract; never create provisional task tables or fall
   back to writing Notion from the native app.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
