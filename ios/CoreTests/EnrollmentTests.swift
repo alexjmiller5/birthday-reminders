@@ -3,7 +3,8 @@ import XCTest
 
 @MainActor final class EnrollmentTests: XCTestCase {
   private var contract: EnrollmentContract {
-    EnrollmentContract(
+    let policy = try! CoreEnrollmentPolicy(profileID: "fixture-birthday", scopes: ["tables:read:people:id"])
+    return EnrollmentContract(
       approvalPath: { "/login?key=\($0)&name=Birthday%20Reminders&profile=fixture-birthday" },
       validate: { body in
         guard body["scopes"] as? [String] == ["tables:read:people:id"],
@@ -11,7 +12,7 @@ import XCTest
           profile["id"] == "fixture-birthday", profile["revision"] == String(repeating: "a", count: 64)
         else { throw EnrollmentFailure("Synthetic profile rejected") }
         return EnrollmentProfileReceipt(id: profile["id"]!, revision: profile["revision"]!)
-      })
+      }, revoked: policy.contract.revoked)
   }
   private func approved(_ candidate: EnrollmentCandidate, scopes: [String] = ["tables:read:people:id"])
     -> EnrollmentReply {
@@ -150,7 +151,7 @@ import XCTest
       XCTAssertNotNil(model.failure)
     }
     let model = EnrollmentSession(contract: .init(
-      approvalPath: { _ in "https://other.example/login" }, validate: { _ in .init(id: "fixture-birthday", revision: String(repeating: "a", count: 64)) }),
+      approvalPath: { _ in "https://other.example/login" }, validate: { _ in .init(id: "fixture-birthday", revision: String(repeating: "a", count: 64)) }, revoked: { _ in false }),
       request: { _, _, _, _ in XCTFail("cross-origin approval used"); return .init(status: 500) },
       install: { _, _, _, _, _ in XCTFail(); return true })
     await model.start(endpoint: "https://hub.example")

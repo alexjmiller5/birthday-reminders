@@ -7,6 +7,7 @@ struct ConnectionView: View {
   @Environment(\.openURL) private var openURL
   @State private var endpoint = ""
   @State private var enrollment: EnrollmentSession?
+  @State private var showCleanup = false
 
   private var waiting: Bool {
     enrollment?.phase == .waiting || enrollment?.phase == .installing
@@ -60,19 +61,35 @@ struct ConnectionView: View {
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") {
-            Task { await enrollment?.cancel(); dismiss() }
+            Task {
+              await enrollment?.cancel()
+              if enrollment?.cleanupMessage != nil { showCleanup = true }
+              else { dismiss() }
+            }
           }.disabled(enrollment?.phase == .installing)
         }
+      }
+      .alert("Approval cleanup", isPresented: $showCleanup) {
+        Button("Close", role: .cancel) { dismiss() }
+      } message: {
+        Text(enrollment?.cleanupMessage ?? "")
       }
       .interactiveDismissDisabled(waiting)
       .task {
         guard enrollment == nil else { return }
-        // Fail closed until Life Core publishes the canonical narrow profile.
-        // Never substitute the existing full-scope /login binding here.
-        enrollment = EnrollmentSession(contract: nil) { endpoint, token, receipt, current, accepted in
-          await model.installApprovedConnection(
-            endpoint: endpoint, token: token, source: PeopleSource(), enrollmentProfile: receipt,
-            isCurrent: current, accepted: accepted)
+        do {
+          // Public service-owned profile, separate from the server Tasks writer.
+          let policy = try CoreEnrollmentPolicy(profileID: "birthday-reminders-reader-v1", scopes: [
+            "tables:read:people:birthday", "tables:read:people:deleted_at", "tables:read:people:id",
+            "tables:read:people:name", "tables:read:people:notify_birthday",
+          ])
+          enrollment = EnrollmentSession(contract: policy.contract) { endpoint, token, receipt, current, accepted in
+            await model.installApprovedConnection(
+              endpoint: endpoint, token: token, source: PeopleSource(), enrollmentProfile: receipt,
+              isCurrent: current, accepted: accepted)
+          }
+        } catch {
+          model.error = "The approval policy could not be loaded. Try reopening the app."
         }
       }
       .onDisappear { Task { await enrollment?.cancel() } }

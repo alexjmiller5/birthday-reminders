@@ -23,10 +23,13 @@ public struct EnrollmentCandidate: Sendable {
 public struct EnrollmentContract {
   public let approvalPath: (String) async throws -> String
   public let validate: ([String: Any]) async throws -> EnrollmentProfileReceipt
+  public let revoked: (EnrollmentReply) async throws -> Bool
   public init(approvalPath: @escaping (String) async throws -> String,
-              validate: @escaping ([String: Any]) async throws -> EnrollmentProfileReceipt) {
+              validate: @escaping ([String: Any]) async throws -> EnrollmentProfileReceipt,
+              revoked: @escaping (EnrollmentReply) async throws -> Bool) {
     self.approvalPath = approvalPath
     self.validate = validate
+    self.revoked = revoked
   }
 }
 
@@ -121,7 +124,7 @@ struct EnrollmentFailure: LocalizedError {
       let path = try await contract.approvalPath(candidate.fingerprint)
       guard generation == id, !Task.isCancelled else { throw CancellationError() }
       guard path.hasPrefix("/"), !path.hasPrefix("//"),
-        let link = URL(string: path, relativeTo: endpoint)?.absoluteURL,
+        let link = URL(string: endpoint.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/")) + path),
         link.scheme == endpoint.scheme, link.host == endpoint.host, link.port == endpoint.port,
         link.user == nil, link.password == nil, link.fragment == nil,
         !(link.absoluteString.removingPercentEncoding ?? "").contains(candidate.token)
@@ -211,9 +214,8 @@ struct EnrollmentFailure: LocalizedError {
     cleanupMessages[fingerprint] = "Approval cleanup is not confirmed yet."
     let message = await Task { @MainActor in
       if let reply = try? await request(value.endpoint, value.candidate.token, true, 30),
-        reply.status == 200, reply.data.count <= 65_536,
-        let body = try? JSONSerialization.jsonObject(with: reply.data) as? [String: Any],
-        body["logged_out"] as? Bool == true {
+        reply.data.count <= 65_536,
+        let contract, (try? await contract.revoked(reply)) == true {
         return "Approval credential revoked."
       }
       return "Revocation is not confirmed. If you approve the old link later, revoke that device in Life Data."

@@ -22,6 +22,7 @@ import JavaScriptCore
         const args = JSON.parse(json);
         if (operation === 'approval') return JSON.stringify(LifeEnrollment.enrollmentApproval(args));
         if (operation === 'validate') return JSON.stringify(LifeEnrollment.validateDeviceSession(args.data, args.expectedProfile));
+        if (operation === 'revoke') return JSON.stringify(LifeEnrollment.sessionRevocationResult(args));
         throw new Error('Unsupported enrollment operation');
       })
       """), context.exception == nil else {
@@ -34,9 +35,12 @@ import JavaScriptCore
 
   public var contract: EnrollmentContract {
     EnrollmentContract(approvalPath: { fingerprint in
-      try await self.approval(fingerprint)
+      try self.approval(fingerprint)
     }, validate: { data in
-      try await self.validate(data)
+      try self.validate(data)
+    }, revoked: { reply in
+      let data: Any = reply.data.isEmpty ? NSNull() : try JSONSerialization.jsonObject(with: reply.data)
+      return try self.call("revoke", ["status": reply.status, "data": data])["state"] as? String == "revoked"
     })
   }
 
