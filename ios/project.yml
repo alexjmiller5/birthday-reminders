@@ -25,6 +25,7 @@ targets:
         BIRTHDAY_BUNDLE_ID: com.example.BirthdayReminders
         PRODUCT_BUNDLE_IDENTIFIER: $(BIRTHDAY_BUNDLE_ID)
         PRODUCT_NAME: BirthdayReminders
+        CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
@@ -36,6 +37,7 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: Birthday Reminders
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
   BirthdayRemindersTests:

@@ -45,7 +45,9 @@ jobs:
           bundle = os.environ["IOS_BUNDLE_ID"]
           if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", bundle):
               raise SystemExit("A valid app bundle identifier is required")
-          Path(os.environ["XCODE_XCCONFIG_FILE"]).write_text(f"BIRTHDAY_BUNDLE_ID = {bundle}\n")
+          build = f"{int(os.environ['GITHUB_RUN_NUMBER'])}.{int(os.environ['GITHUB_RUN_ATTEMPT'])}"
+          Path(os.environ["XCODE_XCCONFIG_FILE"]).write_text(
+              f"BIRTHDAY_BUNDLE_ID = {bundle}\nCURRENT_PROJECT_VERSION = {build}\n")
           PYCONFIG
           "$(realpath "$(command -v xcodegen)")" generate --spec ios/project.yml
           python3 scripts/sign-ios.py --project ios/BirthdayReminders.xcodeproj --scheme BirthdayReminders --output "$RUNNER_TEMP/ios-output"
