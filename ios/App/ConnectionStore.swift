@@ -6,6 +6,7 @@ struct Connection: Codable {
   var endpoint: String
   var token: String
   var source: PeopleSource
+  var enrollmentProfile: EnrollmentProfileReceipt? = nil
 }
 
 struct ConnectionStore {

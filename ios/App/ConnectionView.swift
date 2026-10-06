@@ -41,7 +41,7 @@ struct ConnectionView: View {
             Button("Continue in browser") {
               Task {
                 await enrollment?.start(endpoint: endpoint)
-                if enrollment?.phase == .connected { dismiss() }
+                if enrollment?.phase == .connected, enrollment?.cleanupMessage == nil { dismiss() }
               }
             }.disabled(endpoint.isEmpty || enrollment?.available != true || model.busy)
             if enrollment?.available != true {
@@ -67,9 +67,10 @@ struct ConnectionView: View {
         guard enrollment == nil else { return }
         // Fail closed until Life Core publishes the canonical narrow profile.
         // Never substitute the existing full-scope /login binding here.
-        enrollment = EnrollmentSession(contract: nil) { endpoint, token, current in
+        enrollment = EnrollmentSession(contract: nil) { endpoint, token, receipt, current, accepted in
           await model.installApprovedConnection(
-            endpoint: endpoint, token: token, source: PeopleSource(), isCurrent: current)
+            endpoint: endpoint, token: token, source: PeopleSource(), enrollmentProfile: receipt,
+            isCurrent: current, accepted: accepted)
         }
       }
       .onDisappear { Task { await enrollment?.cancel() } }

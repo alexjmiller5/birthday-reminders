@@ -11,21 +11,31 @@ per-phone mutes, and lets you choose a reminder time and timezone. It stores
 its connection in Keychain and a complete birthday snapshot in Application
 Support. Failed syncs retain the previous snapshot.
 
-Connect with your Life Data HTTPS URL and a dedicated app credential with
-read access. Operator/admin credentials are rejected. The connection form
-lets you map your people table's name, birthday and opt-in columns; IDs and
-soft-deletion fields follow Life Data's standard API contract. Birthdays may
-be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. Edit people and opt-ins
-in Life Data; local mute controls affect this phone only.
+Enrollment is being updated to **Life Data URL + browser approval**. No manual
+credential copying is required or offered by the new connection screen. This
+version keeps approval unavailable until Life Core publishes its narrow
+birthday profile. The existing full-access device approval route must not be
+used as a fallback. The separately installed older release may still show its
+credential field; do not use that field to provision a broader token.
 
-The current Life Data `tables:read` scope permits dataset-wide reads, not
-only birthdays. Review that access before issuing a credential. The native
-app sends no record writes, has no analytics, and never receives infrastructure
-credentials. On a replacement phone, install and connect again; Keychain
-credentials are device-only. Disconnect removes saved connection, cache and
-notifications, leaving Life Data records intact.
+The prepared client generates its own random candidate credential, places only
+its SHA-256 fingerprint/code in the canonical approval link, and checks for
+approval with a bounded session request. It saves only the approved identity
+and profile to device-only Keychain. Cancel, replacement or expiry invalidate
+late responses; failed enrollment preserves an existing accepted connection.
+The service owns the exact scope and approval receipt. Phone access is limited
+to birthday fields; the Tasks writer has a separate identity. Requested columns
+alone do not restrict a whole-table grant.
 
-Allow notifications when asked. Settings includes **Send test notification**:
+Birthdays may be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. Edit people
+and opt-ins in Life Data; local mute controls affect this phone only. The native
+app sends no record writes, has no analytics, and never receives provider/admin
+credentials. A replacement phone enrolls independently. Disconnect clears this
+phone's saved connection, cache and notifications. Revocation stops a credential
+at the service; forgetting local data alone does not prove revocation.
+
+Allow notifications when asked. **No Life Data sign-in is needed to test
+notifications.** Settings includes **Send test notification**:
 leave the app or lock the phone and wait 10 seconds. If permission was denied,
 use **Open notification settings**. Focus modes and notification summaries
 remain controlled by iOS.

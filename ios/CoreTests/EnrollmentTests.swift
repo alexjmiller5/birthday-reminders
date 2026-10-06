@@ -4,13 +4,20 @@ import XCTest
 @MainActor final class EnrollmentTests: XCTestCase {
   private var contract: EnrollmentContract {
     EnrollmentContract(
-      approvalPath: { "/synthetic-approval?key=\($0)" },
-      accepts: { ($0["scopes"] as? [String]) == ["synthetic-birthday-read"] })
+      approvalPath: { "/login?key=\($0)&name=Birthday%20Reminders&profile=fixture-birthday" },
+      validate: { body in
+        guard body["scopes"] as? [String] == ["tables:read:people:id"],
+          let profile = body["enrollmentProfile"] as? [String: String],
+          profile["id"] == "fixture-birthday", profile["revision"] == String(repeating: "a", count: 64)
+        else { throw EnrollmentFailure("Synthetic profile rejected") }
+        return EnrollmentProfileReceipt(id: profile["id"]!, revision: profile["revision"]!)
+      })
   }
-  private func approved(_ candidate: EnrollmentCandidate, scopes: [String] = ["synthetic-birthday-read"])
+  private func approved(_ candidate: EnrollmentCandidate, scopes: [String] = ["tables:read:people:id"])
     -> EnrollmentReply {
     EnrollmentReply(status: 200, data: try! JSONSerialization.data(withJSONObject: [
       "name": "device:" + candidate.fingerprint, "scopes": scopes,
+      "enrollmentProfile": ["id": "fixture-birthday", "revision": String(repeating: "a", count: 64)],
     ]))
   }
 
@@ -28,8 +35,8 @@ import XCTest
   func testUnavailableContractDoesNotGenerateCredentialOrCallNetwork() async {
     let model = EnrollmentSession(contract: nil,
       candidate: { XCTFail("must not create a candidate"); return .init(token: "fixture") },
-      request: { _, _, _ in XCTFail("must not contact full-scope login"); return .init(status: 500) },
-      install: { _, _, _ in XCTFail("must not install"); return true })
+      request: { _, _, _, _ in XCTFail("must not contact full-scope login"); return .init(status: 500) },
+      install: { _, _, _, _, _ in XCTFail("must not install"); return true })
     await model.start(endpoint: "https://hub.example")
     XCTAssertEqual(model.phase, .idle)
     XCTAssertNil(model.approvalURL)
@@ -41,18 +48,19 @@ import XCTest
     var installed = false
     var model: EnrollmentSession!
     model = EnrollmentSession(contract: contract, candidate: { candidate },
-      request: { endpoint, token, revoke in
+      request: { endpoint, token, revoke, _ in
         XCTAssertFalse(revoke)
         XCTAssertEqual(endpoint.absoluteString, "https://hub.example")
         XCTAssertEqual(token, candidate.token)
-        XCTAssertEqual(model.approvalURL?.path, "/synthetic-approval")
+        XCTAssertEqual(model.approvalURL?.path, "/login")
         XCTAssertFalse(model.approvalURL!.absoluteString.contains(candidate.token))
         XCTAssertTrue(model.approvalURL!.absoluteString.contains(candidate.fingerprint))
         return self.approved(candidate)
-      }, install: { _, token, current in
+      }, install: { _, token, _, current, accepted in
         XCTAssertEqual(token, candidate.token)
         XCTAssertTrue(current())
         installed = true
+        accepted()
         return true
       })
     await model.start(endpoint: "https://hub.example")
@@ -67,10 +75,10 @@ import XCTest
       approved(candidate, scopes: ["tables:read"]), approved(.init(token: "different"))] {
       var revoked = false
       let model = EnrollmentSession(contract: contract, candidate: { candidate },
-        request: { _, _, revoke in
+        request: { _, _, revoke, _ in
           if revoke { revoked = true; return .init(status: 200, data: Data(#"{"logged_out":true}"#.utf8)) }
           return reply
-        }, install: { _, _, _ in XCTFail("invalid session installed"); return true })
+        }, install: { _, _, _, _, _ in XCTFail("invalid session installed"); return true })
       await model.start(endpoint: "https://hub.example")
       XCTAssertTrue(revoked)
       XCTAssertEqual(model.phase, .idle)
@@ -84,13 +92,13 @@ import XCTest
     var polls = 0
     let model = EnrollmentSession(contract: contract, candidate: { candidate }, now: { clock },
       sleep: { seconds in XCTAssertEqual(seconds, 5); clock += seconds },
-      request: { _, _, revoke in
+      request: { _, _, revoke, _ in
         if revoke { return .init(status: 401) }
         polls += 1
         if polls == 1 { return .init(status: 401) }
         clock = 301
         return self.approved(candidate)
-      }, install: { _, _, _ in XCTFail("late approval installed"); return true })
+      }, install: { _, _, _, _, _ in XCTFail("late approval installed"); return true })
     await model.start(endpoint: "https://hub.example")
     XCTAssertEqual(polls, 2)
     XCTAssertEqual(model.phase, .idle)
@@ -103,11 +111,11 @@ import XCTest
     var pending: CheckedContinuation<EnrollmentReply, Never>?
     let started = expectation(description: "request started")
     let model = EnrollmentSession(contract: contract, candidate: { candidate },
-      request: { _, token, revoke in
+      request: { _, token, revoke, _ in
         XCTAssertEqual(token, candidate.token)
         if revoke { return .init(status: 200, data: Data(#"{"logged_out":true}"#.utf8)) }
         return await withCheckedContinuation { pending = $0; started.fulfill() }
-      }, install: { _, _, _ in XCTFail("cancelled candidate installed"); return true })
+      }, install: { _, _, _, _, _ in XCTFail("cancelled candidate installed"); return true })
     let run = Task { await model.start(endpoint: "https://hub.example") }
     await fulfillment(of: [started], timeout: 3)
     await model.cancel()
@@ -122,16 +130,16 @@ import XCTest
     for endpoint in ["http://hub.example", "https://u:p@hub.example", "https://hub.example?q=x",
       "https://hub.example#fragment"] {
       let model = EnrollmentSession(contract: contract,
-        request: { _, _, _ in XCTFail("invalid endpoint used"); return .init(status: 500) },
-        install: { _, _, _ in XCTFail(); return true })
+        request: { _, _, _, _ in XCTFail("invalid endpoint used"); return .init(status: 500) },
+        install: { _, _, _, _, _ in XCTFail(); return true })
       await model.start(endpoint: endpoint)
       XCTAssertNil(model.approvalURL)
       XCTAssertNotNil(model.failure)
     }
     let model = EnrollmentSession(contract: .init(
-      approvalPath: { _ in "https://other.example/login" }, accepts: { _ in true }),
-      request: { _, _, _ in XCTFail("cross-origin approval used"); return .init(status: 500) },
-      install: { _, _, _ in XCTFail(); return true })
+      approvalPath: { _ in "https://other.example/login" }, validate: { _ in .init(id: "fixture-birthday", revision: String(repeating: "a", count: 64)) }),
+      request: { _, _, _, _ in XCTFail("cross-origin approval used"); return .init(status: 500) },
+      install: { _, _, _, _, _ in XCTFail(); return true })
     await model.start(endpoint: "https://hub.example")
     XCTAssertNil(model.approvalURL)
   }
@@ -145,15 +153,15 @@ import XCTest
     let started = expectation(description: "first request started")
     let model = EnrollmentSession(contract: contract,
       candidate: { generated += 1; return generated == 1 ? first : second },
-      request: { _, token, revoke in
+      request: { _, token, revoke, _ in
         if revoke { return .init(status: 200, data: Data(#"{"logged_out":true}"#.utf8)) }
         if token == first.token {
           return await withCheckedContinuation { pending = $0; started.fulfill() }
         }
         return self.approved(second)
-      }, install: { _, token, current in
+      }, install: { _, token, _, current, accepted in
         guard current() else { return false }
-        installed.append(token); return true
+        installed.append(token); accepted(); return true
       })
     let old = Task { await model.start(endpoint: "https://hub.example") }
     await fulfillment(of: [started], timeout: 3)
@@ -168,12 +176,13 @@ import XCTest
     let candidate = EnrollmentCandidate(token: "lt_synthetic")
     var clock = 0.0
     let model = EnrollmentSession(contract: contract, candidate: { candidate }, now: { clock },
-      request: { _, _, revoke in
+      request: { _, _, revoke, _ in
         XCTAssertFalse(revoke)
         return self.approved(candidate)
-      }, install: { _, _, current in
+      }, install: { _, _, _, current, accepted in
         XCTAssertTrue(current())
         clock = 301
+        accepted()
         return true
       })
     await model.start(endpoint: "https://hub.example")
@@ -184,15 +193,77 @@ import XCTest
     let candidate = EnrollmentCandidate(token: "lt_synthetic")
     var revoked = false
     let model = EnrollmentSession(contract: contract, candidate: { candidate },
-      request: { _, _, revoke in
+      request: { _, _, revoke, _ in
         if revoke { revoked = true; return .init(status: 401) }
         return self.approved(candidate)
-      }, install: { _, _, current in XCTAssertTrue(current()); return false })
+      }, install: { _, _, _, current, accepted in XCTAssertTrue(current()); return false })
     await model.start(endpoint: "https://hub.example")
     XCTAssertTrue(revoked)
     XCTAssertEqual(model.phase, .idle)
     XCTAssertNotNil(model.failure)
     XCTAssertTrue(model.cleanupMessage!.contains("not confirmed"))
+  }
+
+  func testCancelAfterCommitDoesNotRevokeAcceptedConnection() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var model: EnrollmentSession!
+    model = EnrollmentSession(contract: contract, candidate: { candidate },
+      request: { _, _, revoke, _ in
+        XCTAssertFalse(revoke)
+        return self.approved(candidate)
+      }, install: { _, _, _, current, accepted in
+        XCTAssertTrue(current())
+        accepted()
+        await model.cancel()
+        return true
+      })
+    await model.start(endpoint: "https://hub.example")
+    XCTAssertEqual(model.phase, .connected)
+  }
+
+  func testReplacementRetainsUnconfirmedCleanupWarning() async {
+    let first = EnrollmentCandidate(token: "lt_first")
+    let second = EnrollmentCandidate(token: "lt_second")
+    var generated = 0
+    var pending: CheckedContinuation<EnrollmentReply, Never>?
+    let started = expectation(description: "old request started")
+    let cleaned = expectation(description: "old cleanup attempted")
+    let model = EnrollmentSession(contract: contract,
+      candidate: { generated += 1; return generated == 1 ? first : second },
+      request: { _, token, revoke, _ in
+        if revoke { cleaned.fulfill(); return .init(status: 401) }
+        if token == first.token {
+          return await withCheckedContinuation { pending = $0; started.fulfill() }
+        }
+        return self.approved(second)
+      }, install: { _, _, _, current, accepted in
+        guard current() else { return false }; accepted(); return true
+      })
+    let old = Task { await model.start(endpoint: "https://hub.example") }
+    await fulfillment(of: [started], timeout: 3)
+    await model.start(endpoint: "https://hub.example")
+    await fulfillment(of: [cleaned], timeout: 3)
+    pending?.resume(returning: approved(first))
+    await old.value
+    XCTAssertEqual(model.phase, .connected)
+    XCTAssertTrue(model.cleanupMessage?.contains("not confirmed") == true)
+  }
+
+  func testRequestReceivesRemainingDeadline() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var clock = 0.0
+    let model = EnrollmentSession(contract: contract, candidate: { candidate }, now: { clock },
+      sleep: { _ in clock = 299 },
+      request: { _, _, revoke, timeout in
+        if revoke { return .init(status: 401) }
+        if clock == 0 { return .init(status: 401) }
+        XCTAssertEqual(timeout, 1)
+        return self.approved(candidate)
+      }, install: { _, _, _, current, accepted in
+        XCTAssertTrue(current()); accepted(); return true
+      })
+    await model.start(endpoint: "https://hub.example")
+    XCTAssertEqual(model.phase, .connected)
   }
 
   func testSessionTransportUsesCanonicalGetAndPostWithoutCookiesOrTokenURLs() async throws {

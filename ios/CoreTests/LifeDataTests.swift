@@ -69,11 +69,11 @@ final class LifeDataTests: XCTestCase {
     XCTAssertEqual(requests, 2)
   }
 
-  func testRejectsAdminAndRevokedSessions() async throws {
-    for reply in [(200, #"{"name":"admin","scopes":["admin"]}"#), (401, "{}"), (200, "{}")] {
+  func testUnauthorizedReadsFailClosed() async throws {
+    for reply in [(401, "{}"), (403, "{}")] {
       StubProtocol.handler = { _ in reply }
       do {
-        try await client().validateSession()
+        _ = try await client().people(source: PeopleSource())
         XCTFail("Invalid credential accepted")
       } catch {}
     }
@@ -102,16 +102,14 @@ final class LifeDataTests: XCTestCase {
     }
   }
 
-  func testReadOnlyConsumerSessionIsAcceptedAndRedirectResponseIsRejected() async throws {
-    StubProtocol.handler = { _ in (200, #"{"name":"birthday-device","scopes":["tables:read"]}"#) }
-    try await client().validateSession()
+  func testRedirectResponseIsRejected() async throws {
     var requests = 0
     StubProtocol.handler = { _ in
       requests += 1
       return (302, "{}")
     }
     do {
-      try await client().validateSession()
+      _ = try await client().people(source: PeopleSource())
       XCTFail("Redirect response accepted")
     } catch BirthdayError.http(let status) {
       XCTAssertEqual(status, 302)

@@ -17,8 +17,18 @@ Changing it or pushing main can affect the live service.
 - Run `swift test --scratch-path /tmp/birthday-reminders-swift-build` for core
   tests, `just -f ios/justfile test` for Keychain/model/UI tests, and
   `just -f ios/justfile run` for the simulator. Derived data stays outside iCloud.
-- Credentials belong in this app's Keychain, never the bundle, defaults or
-  fixtures. Endpoint and source mapping are supplied through the connection UI.
+- Enrollment UX is URL plus explicit browser approval, never manual token entry.
+  `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
+  bounded polling and generation/deadline fencing. The canonical narrow-profile
+  binding is pending; production must keep `EnrollmentContract` absent until
+  published. Never substitute Life UI's full-replica `/login` contract.
+- Credentials belong in this app's device-only Keychain, never the bundle,
+  defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
+  phone People read and Tasks writer use separate identities. Candidate cleanup
+  uses POST `/v1/session`; only `{logged_out:true}` proves revocation, not 401.
+- An approved installer must check its enrollment attempt before committing.
+  Save the cache before replacing Keychain; failed/canceled enrollment preserves
+  the previously accepted connection. Notification testing needs no enrollment.
 - Source opt-ins come from Life Data. Mutes are per-phone preferences.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
@@ -27,8 +37,9 @@ Changing it or pushing main can affect the live service.
   published catalog contract; never create provisional task tables or fall
   back to writing Notion from the native app.
 - Consumer access uses dedicated Life Data credentials through its API only.
-  Current table scopes are dataset-wide; broader access needs explicit approval
-  before provisioning. No live native credential is bundled or provisioned.
+  Exact-table grants are whole-table grants, not enforced column projection.
+  Enforced birthday-field reads and create-only Tasks enrollment remain pending.
+  No live consumer credential is bundled or provisioned; no broad fallback.
 - Personal Ad Hoc delivery uses `.github/workflows/build-ios.yml`, manual only.
   `scripts/sign-ios.py` verifies profile, identity and export in a disposable
   keychain. Only per-dispatch age-encrypted IPA artifacts are uploaded, retained

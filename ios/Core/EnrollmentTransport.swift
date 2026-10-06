@@ -10,20 +10,28 @@ public enum EnrollmentTransport {
     return url
   }
 
-  public static func request(endpoint: URL, token: String, revoking: Bool) async throws -> EnrollmentReply {
-    try await request(endpoint: endpoint, token: token, revoking: revoking, session: .shared)
+  public static func request(endpoint: URL, token: String, revoking: Bool, timeout: Double) async throws -> EnrollmentReply {
+    try await request(endpoint: endpoint, token: token, revoking: revoking, timeout: timeout, session: .shared)
   }
 
-  static func request(endpoint: URL, token: String, revoking: Bool, session: URLSession) async throws -> EnrollmentReply {
+  static func request(endpoint: URL, token: String, revoking: Bool, timeout: Double = 30, session: URLSession) async throws -> EnrollmentReply {
     let endpoint = try self.endpoint(endpoint.absoluteString)
+    guard timeout.isFinite, timeout > 0 else { throw URLError(.timedOut) }
+    let configuration = session.configuration
+    configuration.timeoutIntervalForRequest = min(30, timeout)
+    configuration.timeoutIntervalForResource = min(30, timeout)
+    configuration.httpCookieStorage = nil
+    configuration.urlCache = nil
+    let boundedSession = URLSession(configuration: configuration)
+    defer { boundedSession.invalidateAndCancel() }
     var request = URLRequest(url: endpoint.appendingPathComponent("v1/session"))
     request.httpMethod = revoking ? "POST" : "GET"
     request.httpShouldHandleCookies = false
     request.cachePolicy = .reloadIgnoringLocalCacheData
-    request.timeoutInterval = 30
+    request.timeoutInterval = min(30, timeout)
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
     request.setValue("application/json", forHTTPHeaderField: "Accept")
-    let (bytes, response) = try await session.bytes(for: request, delegate: EnrollmentNoRedirect())
+    let (bytes, response) = try await boundedSession.bytes(for: request, delegate: EnrollmentNoRedirect())
     guard let response = response as? HTTPURLResponse else {
       throw EnrollmentFailure("Invalid approval response.")
     }

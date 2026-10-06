@@ -21,13 +21,20 @@ public struct EnrollmentCandidate: Sendable {
 /// No production binding exists until Life Core publishes narrow enrollment.
 /// In particular, do not bind this to the legacy full-scope /login operation.
 public struct EnrollmentContract {
-  public let approvalPath: (String) throws -> String
-  public let accepts: ([String: Any]) throws -> Bool
-  public init(approvalPath: @escaping (String) throws -> String,
-              accepts: @escaping ([String: Any]) throws -> Bool) {
+  public let approvalPath: (String) async throws -> String
+  public let validate: ([String: Any]) async throws -> EnrollmentProfileReceipt
+  public init(approvalPath: @escaping (String) async throws -> String,
+              validate: @escaping ([String: Any]) async throws -> EnrollmentProfileReceipt) {
     self.approvalPath = approvalPath
-    self.accepts = accepts
+    self.validate = validate
   }
+}
+
+/// Evidence returned by the canonical profile validator, not a grant request.
+public struct EnrollmentProfileReceipt: Codable, Equatable, Sendable {
+  public let id: String
+  public let revision: String
+  public init(id: String, revision: String) { self.id = id; self.revision = revision }
 }
 
 public struct EnrollmentReply {
@@ -53,11 +60,15 @@ struct EnrollmentFailure: LocalizedError {
   public private(set) var approvalURL: URL?
   public private(set) var approvalCode: String?
   public private(set) var failure: String?
-  public private(set) var cleanupMessage: String?
+  private var cleanupMessages: [String: String] = [:]
+  public var cleanupMessage: String? {
+    cleanupMessages.isEmpty ? nil : cleanupMessages.sorted { $0.key < $1.key }.map(\.value).joined(separator: "\n")
+  }
   public var available: Bool { contract != nil }
 
-  public typealias Request = (URL, String, Bool) async throws -> EnrollmentReply
-  public typealias Install = (String, String, @escaping @MainActor () -> Bool) async -> Bool
+  public typealias Request = (URL, String, Bool, Double) async throws -> EnrollmentReply
+  public typealias Install = (String, String, EnrollmentProfileReceipt, @escaping @MainActor () -> Bool,
+                             @escaping @MainActor () -> Void) async -> Bool
   private let contract: EnrollmentContract?
   private let candidate: () throws -> EnrollmentCandidate
   private let now: () -> Double
@@ -94,10 +105,12 @@ struct EnrollmentFailure: LocalizedError {
     let id = generation
     let previous = attempt
     attempt = nil
-    if let previous { Task { _ = await cleanup(previous) } }
+    if let previous {
+      cleanupMessages[previous.candidate.fingerprint] = "Previous approval cleanup is not confirmed yet."
+      Task { await cleanup(previous) }
+    }
     clearApproval()
     failure = nil
-    cleanupMessage = nil
     phase = .idle
     do {
       let endpoint = try EnrollmentTransport.endpoint(endpoint)
@@ -105,7 +118,8 @@ struct EnrollmentFailure: LocalizedError {
         throw EnrollmentFailure("Birthday-only approval is not available yet. You can still test notifications in Settings.")
       }
       let candidate = try candidate()
-      let path = try contract.approvalPath(candidate.fingerprint)
+      let path = try await contract.approvalPath(candidate.fingerprint)
+      guard generation == id, !Task.isCancelled else { throw CancellationError() }
       guard path.hasPrefix("/"), !path.hasPrefix("//"),
         let link = URL(string: path, relativeTo: endpoint)?.absoluteURL,
         link.scheme == endpoint.scheme, link.host == endpoint.host, link.port == endpoint.port,
@@ -121,7 +135,7 @@ struct EnrollmentFailure: LocalizedError {
         try check(next)
         let reply: EnrollmentReply
         do {
-          reply = try await request(endpoint, candidate.token, false)
+          reply = try await request(endpoint, candidate.token, false, min(30, next.deadline - now()))
         } catch is URLError {
           try check(next)
           try await sleep(min(5, next.deadline - now()))
@@ -133,19 +147,26 @@ struct EnrollmentFailure: LocalizedError {
           guard let body = try JSONSerialization.jsonObject(with: reply.data) as? [String: Any],
             body["name"] as? String == "device:" + candidate.fingerprint,
             let scopes = body["scopes"] as? [String],
-            !scopes.contains("full"), !scopes.contains("admin"), try contract.accepts(body)
+            !scopes.contains("full"), !scopes.contains("admin")
           else { throw EnrollmentFailure("Life Data did not approve birthday-only access for this device.") }
+          let receipt = try await contract.validate(body)
+          try check(next)
           phase = .installing
-          let installed = await install(endpoint.absoluteString, candidate.token) { [weak self] in
+          let installed = await install(endpoint.absoluteString, candidate.token, receipt, { [weak self] in
             guard let self else { return false }
             return (try? self.check(next)) != nil
-          }
+          }, { [weak self] in
+            guard let self, self.generation == id else { return }
+            // Called synchronously at the persistence commit, before yielding.
+            self.attempt = nil
+            self.phase = .connected
+            self.clearApproval()
+          })
+          guard generation == id else { return }
+          if phase == .connected { return }
           try check(next)
           guard installed else { throw EnrollmentFailure("Could not save the approved connection. Your previous connection is unchanged.") }
-          attempt = nil
-          phase = .connected
-          clearApproval()
-          return
+          throw EnrollmentFailure("The connection was not committed. Try again.")
         }
         guard [401, 403, 429].contains(reply.status) || (500...599).contains(reply.status) else {
           throw EnrollmentFailure("Life Data could not complete approval. Try again.")
@@ -162,22 +183,20 @@ struct EnrollmentFailure: LocalizedError {
       clearApproval()
       failure = (error as? EnrollmentFailure)?.message ?? "Approval could not finish. Try again."
       if let previous {
-        let message = await cleanup(previous)
-        if generation == id { cleanupMessage = message }
+        await cleanup(previous)
       }
     }
   }
 
   public func cancel() async {
+    guard phase != .connected else { return }
     generation += 1
-    let id = generation
     let previous = attempt
     attempt = nil
     phase = .idle
     clearApproval()
     guard let previous else { return }
-    let message = await cleanup(previous)
-    if generation == id { cleanupMessage = message }
+    await cleanup(previous)
   }
 
   private func check(_ value: Attempt) throws {
@@ -187,9 +206,11 @@ struct EnrollmentFailure: LocalizedError {
     }
   }
 
-  private func cleanup(_ value: Attempt) async -> String {
-    await Task { @MainActor in
-      if let reply = try? await request(value.endpoint, value.candidate.token, true),
+  private func cleanup(_ value: Attempt) async {
+    let fingerprint = value.candidate.fingerprint
+    cleanupMessages[fingerprint] = "Approval cleanup is not confirmed yet."
+    let message = await Task { @MainActor in
+      if let reply = try? await request(value.endpoint, value.candidate.token, true, 30),
         reply.status == 200, reply.data.count <= 65_536,
         let body = try? JSONSerialization.jsonObject(with: reply.data) as? [String: Any],
         body["logged_out"] as? Bool == true {
@@ -197,6 +218,7 @@ struct EnrollmentFailure: LocalizedError {
       }
       return "Revocation is not confirmed. If you approve the old link later, revoke that device in Life Data."
     }.value
+    cleanupMessages[fingerprint] = message
   }
 
   private func clearApproval() {

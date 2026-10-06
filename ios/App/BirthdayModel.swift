@@ -63,9 +63,15 @@ final class BirthdayModel {
   // Called only after EnrollmentSession validates the candidate identity/profile.
   func installApprovedConnection(
     endpoint: String, token: String, source: PeopleSource,
-    isCurrent: @escaping @MainActor () -> Bool = { true }
+    enrollmentProfile: EnrollmentProfileReceipt? = nil,
+    isCurrent: @escaping @MainActor () -> Bool = { true },
+    accepted: @escaping @MainActor () -> Void = {}
   ) async -> Bool {
-    guard !busy, isCurrent() else { return false }
+    while busy {
+      guard isCurrent(), !Task.isCancelled else { return false }
+      do { try await Task.sleep(for: .milliseconds(100)) } catch { return false }
+    }
+    guard isCurrent() else { return false }
     busy = true
     defer { busy = false }
     do {
@@ -75,7 +81,8 @@ final class BirthdayModel {
       let people = try await client.people(source: source)
       let value = BirthdaySnapshot(
         endpoint: endpoint, source: source, people: people, fetchedAt: Date())
-      let newConnection = Connection(endpoint: endpoint, token: token, source: source)
+      let newConnection = Connection(endpoint: endpoint, token: token, source: source,
+        enrollmentProfile: enrollmentProfile)
       try Task.checkCancellation()
       guard isCurrent() else { throw CancellationError() }
       let previousSnapshot = try? cache.load()
@@ -91,6 +98,7 @@ final class BirthdayModel {
       }
       connection = newConnection
       snapshot = value
+      accepted()
       error = nil
       rebuildUpcoming()
       await reschedule()

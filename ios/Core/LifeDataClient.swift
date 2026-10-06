@@ -20,17 +20,6 @@ public final class LifeDataClient: @unchecked Sendable {
     self.token = token
     self.session = session
   }
-  public func validateSession() async throws {
-    let reply = try await request(path: "v1/session")
-    guard let name = reply["name"] as? String, let scopes = reply["scopes"] as? [String] else {
-      throw BirthdayError.invalidResponse
-    }
-    guard name != "admin", !scopes.contains("admin") else { throw BirthdayError.adminCredential }
-    guard scopes.contains("tables:read") || scopes.contains("full") else {
-      throw BirthdayError.unauthorized
-    }
-  }
-
   public func people(source: PeopleSource) async throws -> [BirthdayPerson] {
     var people: [String: BirthdayPerson] = [:]
     var seenCursors: Set<String> = []

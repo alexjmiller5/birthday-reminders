@@ -29,6 +29,50 @@ private final class AcceptedProtocol: URLProtocol {
 }
 
 final class ModelTests: XCTestCase {
+  @MainActor func testApprovedInstallWaitsForBusyWorkAndPersistsProfileReceipt() async throws {
+    let id = UUID().uuidString
+    let credentials = ConnectionStore(service: id)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(id)
+    let defaults = UserDefaults(suiteName: id)!
+    defer {
+      try? credentials.clear()
+      defaults.removePersistentDomain(forName: id)
+      try? FileManager.default.removeItem(at: directory)
+    }
+    try credentials.save(Connection(
+      endpoint: "https://accepted.example", token: "accepted-fixture", source: PeopleSource()))
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [AcceptedProtocol.self]
+    let started = expectation(description: "busy work started")
+    var pending: CheckedContinuation<Bool, Never>?
+    let model = BirthdayModel(cache: BirthdayCache(url: directory.appendingPathComponent("cache.json")),
+      credentials: credentials, defaults: defaults, session: URLSession(configuration: config),
+      authorize: {
+        await withCheckedContinuation { pending = $0; started.fulfill() }
+      })
+    let busyWork = Task { await model.enableNotifications() }
+    await fulfillment(of: [started], timeout: 3)
+    let receipt = EnrollmentProfileReceipt(id: "fixture-birthday", revision: String(repeating: "a", count: 64))
+    var committed = false
+    let install = Task {
+      await model.installApprovedConnection(endpoint: "https://candidate.example",
+        token: "candidate-fixture", source: PeopleSource(), enrollmentProfile: receipt,
+        accepted: {
+          committed = true
+          XCTAssertEqual(model.connection?.token, "candidate-fixture")
+        })
+    }
+    await Task.yield()
+    XCTAssertFalse(committed)
+    XCTAssertEqual(try credentials.load()?.token, "accepted-fixture")
+    pending?.resume(returning: false)
+    await busyWork.value
+    let connected = await install.value
+    XCTAssertTrue(connected)
+    XCTAssertTrue(committed)
+    XCTAssertEqual(try credentials.load()?.enrollmentProfile, receipt)
+  }
+
   @MainActor func testFailedCacheSavePreservesAcceptedCredential() async throws {
     let id = UUID().uuidString
     let credentials = ConnectionStore(service: id)
