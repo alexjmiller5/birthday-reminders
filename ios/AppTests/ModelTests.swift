@@ -49,11 +49,39 @@ final class ModelTests: XCTestCase {
     let model = BirthdayModel(
       cache: BirthdayCache(url: blocker.appendingPathComponent("birthdays.json")),
       credentials: credentials, defaults: defaults, session: URLSession(configuration: configuration))
-    let connected = await model.connect(
+    let connected = await model.installApprovedConnection(
       endpoint: "https://candidate.example", token: "candidate-fixture", source: PeopleSource())
     XCTAssertFalse(connected)
     XCTAssertEqual(model.connection?.token, "accepted-fixture")
     XCTAssertEqual(try credentials.load()?.token, "accepted-fixture")
+  }
+
+  @MainActor func testReplacedApprovalCannotReplaceAcceptedConnection() async throws {
+    let id = UUID().uuidString
+    let credentials = ConnectionStore(service: id)
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(id)
+    let defaults = UserDefaults(suiteName: id)!
+    defer {
+      try? credentials.clear()
+      defaults.removePersistentDomain(forName: id)
+      try? FileManager.default.removeItem(at: directory)
+    }
+    try credentials.save(Connection(
+      endpoint: "https://accepted.example", token: "accepted-fixture", source: PeopleSource()))
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [AcceptedProtocol.self]
+    let model = BirthdayModel(cache: BirthdayCache(url: directory.appendingPathComponent("cache.json")),
+      credentials: credentials, defaults: defaults, session: URLSession(configuration: config))
+    var checks = 0
+    let connected = await model.installApprovedConnection(endpoint: "https://candidate.example",
+      token: "candidate-fixture", source: PeopleSource(), isCurrent: {
+        checks += 1
+        return checks == 1
+      })
+    XCTAssertFalse(connected)
+    XCTAssertGreaterThan(checks, 1)
+    XCTAssertEqual(try credentials.load()?.token, "accepted-fixture")
+    XCTAssertEqual(model.connection?.token, "accepted-fixture")
   }
 
   @MainActor func testDisconnectCannotRaceNotificationAuthorization() async throws {

@@ -4,62 +4,75 @@ import SwiftUI
 struct ConnectionView: View {
   @Bindable var model: BirthdayModel
   @Environment(\.dismiss) private var dismiss
+  @Environment(\.openURL) private var openURL
   @State private var endpoint = ""
-  @State private var credential = ""
-  @State private var source = PeopleSource()
+  @State private var enrollment: EnrollmentSession?
+
+  private var waiting: Bool {
+    enrollment?.phase == .waiting || enrollment?.phase == .installing
+  }
+
   var body: some View {
     NavigationStack {
       Form {
         Section {
           Text("Connect your birthdays").font(.title2.bold())
-          Text(
-            "Use your Life Data address and a dedicated app credential. Your credential stays in this phone’s Keychain."
-          )
-          .foregroundStyle(.secondary)
+          Text("Enter your Life Data address, then approve Birthday Reminders in your browser. This phone keeps its connection securely in Keychain.")
+            .foregroundStyle(.secondary)
         }
         Section("Connection") {
           TextField("Life Data URL", text: $endpoint).keyboardType(.URL)
             .textInputAutocapitalization(.never).autocorrectionDisabled()
-          SecureField("App credential", text: $credential)
-            .textInputAutocapitalization(.never).autocorrectionDisabled()
-        }
-        Section {
-          DisclosureGroup("Birthday source") {
-            TextField("Table", text: $source.table)
-            TextField("Name column", text: $source.nameColumn)
-            TextField("Birthday column", text: $source.birthdayColumn)
-            TextField("Opt-in column", text: $source.enabledColumn)
-          }.textInputAutocapitalization(.never).autocorrectionDisabled()
+            .disabled(waiting)
         } footer: {
-          Text("Birthdays stay in Life Data. This app reads them and honors their opt-in setting.")
+          Text("This app requests birthday-only read access. Your opt-in choices stay in Life Data.")
         }
-        if let error = model.error { Section { Text(error).foregroundStyle(.red) } }
         Section {
-          Button("Connect") {
-            Task {
-              if await model.connect(endpoint: endpoint, token: credential, source: source) {
-                credential = ""
-                dismiss()
+          if waiting {
+            if let code = enrollment?.approvalCode {
+              LabeledContent("Approval code", value: code)
+            }
+            if let url = enrollment?.approvalURL {
+              Button("Open approval link") { openURL(url) }
+            }
+            Text(enrollment?.phase == .installing ? "Saving connection..." : "Waiting for your approval...")
+            Button("Cancel approval") { Task { await enrollment?.cancel() } }
+          } else {
+            Button("Continue in browser") {
+              Task {
+                await enrollment?.start(endpoint: endpoint)
+                if enrollment?.phase == .connected { dismiss() }
               }
+            }.disabled(endpoint.isEmpty || enrollment?.available != true || model.busy)
+            if enrollment?.available != true {
+              Text("Birthday-only approval is not available yet. You can still test notifications in Settings.")
+                .foregroundStyle(.secondary)
             }
           }
-          .disabled(
-            model.busy || endpoint.isEmpty || credential.isEmpty
-              || [source.table, source.nameColumn, source.birthdayColumn, source.enabledColumn]
-                .contains(where: \.isEmpty)
-          )
+          if let failure = enrollment?.failure { Text(failure).foregroundStyle(.red) }
+          if let cleanup = enrollment?.cleanupMessage { Text(cleanup).foregroundStyle(.secondary) }
+          if let error = model.error { Text(error).foregroundStyle(.red) }
         }
       }
       .navigationTitle("Life Data")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Cancel") {
-            credential = ""
-            dismiss()
-          }.disabled(model.busy)
+          Button("Done") {
+            Task { await enrollment?.cancel(); dismiss() }
+          }.disabled(enrollment?.phase == .installing)
         }
       }
-      .interactiveDismissDisabled(model.busy)
+      .interactiveDismissDisabled(waiting)
+      .task {
+        guard enrollment == nil else { return }
+        // Fail closed until Life Core publishes the canonical narrow profile.
+        // Never substitute the existing full-scope /login binding here.
+        enrollment = EnrollmentSession(contract: nil) { endpoint, token, current in
+          await model.installApprovedConnection(
+            endpoint: endpoint, token: token, source: PeopleSource(), isCurrent: current)
+        }
+      }
+      .onDisappear { Task { await enrollment?.cancel() } }
     }
   }
 }

@@ -12,6 +12,7 @@ permissions:
 jobs:
   check:
     runs-on: macos-15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - name: Test signing and encrypted artifact delivery
@@ -32,3 +33,12 @@ jobs:
           -scheme BirthdayReminders -destination 'generic/platform=iOS Simulator'
           -derivedDataPath "$RUNNER_TEMP/birthday-ios"
           CODE_SIGNING_ALLOWED=NO build
+      - name: Test connection storage and onboarding on simulator
+        working-directory: ios
+        run: |
+          IOS_TEST_DEVICE=$(xcrun simctl list devices available --json | python3 -c 'import json,sys; d=json.load(sys.stdin); print(next(v["udid"] for k,vs in d["devices"].items() if "iOS" in k for v in vs if v["name"].startswith("iPhone")))')
+          xcodebuild -project BirthdayReminders.xcodeproj -scheme BirthdayReminders \
+            -destination "platform=iOS Simulator,id=$IOS_TEST_DEVICE" \
+            -derivedDataPath "$RUNNER_TEMP/birthday-ios-tests" \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES \
+            -resultBundlePath "$RUNNER_TEMP/birthday-tests.xcresult" test

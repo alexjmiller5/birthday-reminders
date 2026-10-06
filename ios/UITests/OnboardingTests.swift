@@ -7,17 +7,15 @@ final class OnboardingTests: XCTestCase {
     XCTAssertTrue(app.buttons["Connect Life Data"].waitForExistence(timeout: 5))
     app.buttons["Connect Life Data"].tap()
     XCTAssertTrue(app.textFields["Life Data URL"].waitForExistence(timeout: 3))
-    XCTAssertTrue(app.secureTextFields["App credential"].exists)
-    XCTAssertFalse(app.buttons["Connect"].isEnabled)
+    XCTAssertFalse(app.secureTextFields["App credential"].exists)
+    XCTAssertFalse(app.buttons["Continue in browser"].isEnabled)
     app.textFields["Life Data URL"].tap()
-    app.textFields["Life Data URL"].typeText("http://example.invalid")
-    app.secureTextFields["App credential"].tap()
-    app.secureTextFields["App credential"].typeText("test-value")
-    app.buttons["Connect"].tap()
+    app.textFields["Life Data URL"].typeText("https://example.invalid")
+    XCTAssertFalse(app.buttons["Continue in browser"].isEnabled)
     XCTAssertTrue(
-      app.staticTexts["Enter an HTTPS endpoint without credentials, a query or a fragment."]
+      app.staticTexts["Birthday-only approval is not available yet. You can still test notifications in Settings."]
         .waitForExistence(timeout: 3))
-    app.buttons["Cancel"].tap()
+    app.buttons["Done"].tap()
     app.buttons["Settings"].tap()
     XCTAssertTrue(app.staticTexts["Reminder time"].waitForExistence(timeout: 3))
     XCTAssertTrue(app.buttons["Send test notification"].exists)

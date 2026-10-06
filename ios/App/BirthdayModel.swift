@@ -60,21 +60,35 @@ final class BirthdayModel {
     } catch { self.error = "Saved data could not be loaded. Reconnect to Life Data." }
   }
 
-  func connect(endpoint: String, token: String, source: PeopleSource) async -> Bool {
-    guard !busy else { return false }
+  // Called only after EnrollmentSession validates the candidate identity/profile.
+  func installApprovedConnection(
+    endpoint: String, token: String, source: PeopleSource,
+    isCurrent: @escaping @MainActor () -> Bool = { true }
+  ) async -> Bool {
+    guard !busy, isCurrent() else { return false }
     busy = true
     defer { busy = false }
     do {
       let endpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
       let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
       let client = try LifeDataClient(endpoint: endpoint, token: token, session: session)
-      try await client.validateSession()
       let people = try await client.people(source: source)
       let value = BirthdaySnapshot(
         endpoint: endpoint, source: source, people: people, fetchedAt: Date())
       let newConnection = Connection(endpoint: endpoint, token: token, source: source)
-      try credentials.save(newConnection)
-      try cache.save(value)
+      try Task.checkCancellation()
+      guard isCurrent() else { throw CancellationError() }
+      let previousSnapshot = try? cache.load()
+      do {
+        try cache.save(value)
+        // Keychain is the acceptance commit point. A failed cache write must
+        // never replace the previously accepted credential.
+        try credentials.save(newConnection)
+      } catch {
+        if let previousSnapshot { try? cache.save(previousSnapshot) }
+        else { try? cache.clear() }
+        throw error
+      }
       connection = newConnection
       snapshot = value
       error = nil

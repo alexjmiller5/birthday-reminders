@@ -135,4 +135,92 @@ import XCTest
     await model.start(endpoint: "https://hub.example")
     XCTAssertNil(model.approvalURL)
   }
+
+  func testReplacementFencesOldApproval() async {
+    let first = EnrollmentCandidate(token: "lt_first")
+    let second = EnrollmentCandidate(token: "lt_second")
+    var generated = 0
+    var pending: CheckedContinuation<EnrollmentReply, Never>?
+    var installed: [String] = []
+    let started = expectation(description: "first request started")
+    let model = EnrollmentSession(contract: contract,
+      candidate: { generated += 1; return generated == 1 ? first : second },
+      request: { _, token, revoke in
+        if revoke { return .init(status: 200, data: Data(#"{"logged_out":true}"#.utf8)) }
+        if token == first.token {
+          return await withCheckedContinuation { pending = $0; started.fulfill() }
+        }
+        return self.approved(second)
+      }, install: { _, token, current in
+        guard current() else { return false }
+        installed.append(token); return true
+      })
+    let old = Task { await model.start(endpoint: "https://hub.example") }
+    await fulfillment(of: [started], timeout: 3)
+    await model.start(endpoint: "https://hub.example")
+    pending?.resume(returning: approved(first))
+    await old.value
+    XCTAssertEqual(installed, [second.token])
+    XCTAssertEqual(model.phase, .connected)
+  }
+
+  func testSuccessfulCommitIsNotRevokedWhenDeadlinePassesImmediatelyAfterIt() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var clock = 0.0
+    let model = EnrollmentSession(contract: contract, candidate: { candidate }, now: { clock },
+      request: { _, _, revoke in
+        XCTAssertFalse(revoke)
+        return self.approved(candidate)
+      }, install: { _, _, current in
+        XCTAssertTrue(current())
+        clock = 301
+        return true
+      })
+    await model.start(endpoint: "https://hub.example")
+    XCTAssertEqual(model.phase, .connected)
+  }
+
+  func testFailedInstallAttemptsCleanupWithoutClaimingConnection() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var revoked = false
+    let model = EnrollmentSession(contract: contract, candidate: { candidate },
+      request: { _, _, revoke in
+        if revoke { revoked = true; return .init(status: 401) }
+        return self.approved(candidate)
+      }, install: { _, _, current in XCTAssertTrue(current()); return false })
+    await model.start(endpoint: "https://hub.example")
+    XCTAssertTrue(revoked)
+    XCTAssertEqual(model.phase, .idle)
+    XCTAssertNotNil(model.failure)
+    XCTAssertTrue(model.cleanupMessage!.contains("not confirmed"))
+  }
+
+  func testSessionTransportUsesCanonicalGetAndPostWithoutCookiesOrTokenURLs() async throws {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [StubProtocol.self]
+    let session = URLSession(configuration: config)
+    for revoking in [false, true] {
+      StubProtocol.handler = { request in
+        XCTAssertEqual(request.url?.absoluteString, "https://hub.example/v1/session")
+        XCTAssertEqual(request.httpMethod, revoking ? "POST" : "GET")
+        XCTAssertFalse(request.httpShouldHandleCookies)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer lt_fixture")
+        return (revoking ? 200 : 401, revoking ? #"{"logged_out":true}"# : "{}")
+      }
+      let reply = try await EnrollmentTransport.request(endpoint: URL(string: "https://hub.example")!,
+        token: "lt_fixture", revoking: revoking, session: session)
+      XCTAssertEqual(reply.status, revoking ? 200 : 401)
+    }
+  }
+
+  func testOversizedSessionReplyIsRejected() async throws {
+    let config = URLSessionConfiguration.ephemeral
+    config.protocolClasses = [StubProtocol.self]
+    StubProtocol.handler = { _ in (200, String(repeating: "x", count: 65_537)) }
+    do {
+      _ = try await EnrollmentTransport.request(endpoint: URL(string: "https://hub.example")!,
+        token: "lt_fixture", revoking: false, session: URLSession(configuration: config))
+      XCTFail("oversized reply accepted")
+    } catch {}
+  }
 }
