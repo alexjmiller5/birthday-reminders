@@ -66,7 +66,7 @@ struct ConnectionView: View {
               if enrollment?.cleanupMessage != nil { showCleanup = true }
               else { dismiss() }
             }
-          }.disabled(enrollment?.phase == .installing)
+          }.disabled(enrollment?.phase == .installing || enrollment?.isCleaningUp == true)
         }
       }
       .alert("Approval cleanup", isPresented: $showCleanup) {

@@ -64,6 +64,8 @@ struct EnrollmentFailure: LocalizedError {
   public private(set) var approvalCode: String?
   public private(set) var failure: String?
   private var cleanupMessages: [String: String] = [:]
+  private var pendingCleanup: Set<String> = []
+  public var isCleaningUp: Bool { !pendingCleanup.isEmpty }
   public var cleanupMessage: String? {
     cleanupMessages.isEmpty ? nil : cleanupMessages.sorted { $0.key < $1.key }.map(\.value).joined(separator: "\n")
   }
@@ -110,6 +112,7 @@ struct EnrollmentFailure: LocalizedError {
     attempt = nil
     if let previous {
       cleanupMessages[previous.candidate.fingerprint] = "Previous approval cleanup is not confirmed yet."
+      pendingCleanup.insert(previous.candidate.fingerprint)
       Task { await cleanup(previous) }
     }
     clearApproval()
@@ -211,6 +214,8 @@ struct EnrollmentFailure: LocalizedError {
 
   private func cleanup(_ value: Attempt) async {
     let fingerprint = value.candidate.fingerprint
+    pendingCleanup.insert(fingerprint)
+    defer { pendingCleanup.remove(fingerprint) }
     cleanupMessages[fingerprint] = "Approval cleanup is not confirmed yet."
     let message = await Task { @MainActor in
       if let reply = try? await request(value.endpoint, value.candidate.token, true, 30),
