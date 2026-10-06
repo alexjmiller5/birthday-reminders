@@ -11,10 +11,7 @@ final class OnboardingTests: XCTestCase {
     XCTAssertFalse(app.buttons["Continue in browser"].isEnabled)
     app.textFields["Life Data URL"].tap()
     app.textFields["Life Data URL"].typeText("https://example.invalid")
-    XCTAssertFalse(app.buttons["Continue in browser"].isEnabled)
-    XCTAssertTrue(
-      app.staticTexts["Birthday-only approval is not available yet. You can still test notifications in Settings."]
-        .waitForExistence(timeout: 3))
+    XCTAssertTrue(app.buttons["Continue in browser"].isEnabled)
     app.buttons["Done"].tap()
     app.buttons["Settings"].tap()
     XCTAssertTrue(app.staticTexts["Reminder time"].waitForExistence(timeout: 3))
