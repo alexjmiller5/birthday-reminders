@@ -31,7 +31,8 @@ final class BirthdayModel {
   init(
     cache: BirthdayCache = BirthdayCache(
       url: URL.applicationSupportDirectory.appendingPathComponent(
-        "BirthdayReminders/birthdays.json")),
+        "birthdays/birthdays.json"),
+      legacyURL: URL.applicationSupportDirectory.appendingPathComponent("BirthdayReminders/birthdays.json")),
     credentials: ConnectionStore = ConnectionStore(), defaults: UserDefaults = .standard,
     session: URLSession = .shared,
     authorize: @escaping () async throws -> Bool = {
