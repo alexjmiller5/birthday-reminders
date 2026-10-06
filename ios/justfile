@@ -70,9 +70,9 @@ _install artifact:
       scp -q -r -o ConnectTimeout=5 "$artifact" "{{install_host}}:/tmp/" \
         && ssh -o ConnectTimeout=5 "{{install_host}}" "$cmd '$remote'" && exit 0
     fi
-    echo "install failed: the phone is not reachable over the local network"
+    echo "installation failed; see the device or transfer error above"
     echo "artifact: $artifact"
-    echo "connect the phone to its paired Mac, then rerun the installation"
+    echo "if the phone is locked, unlock it and keep it awake; otherwise check its connection to the paired Mac"
     echo "local install command: $cmd '$artifact'"
     exit 1
 
