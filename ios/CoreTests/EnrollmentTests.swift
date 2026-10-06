@@ -69,6 +69,19 @@ import XCTest
     XCTAssertNil(model.approvalURL)
   }
 
+  func testApprovalPreservesEndpointPathPrefix() async {
+    let candidate = EnrollmentCandidate(token: "lt_synthetic")
+    var model: EnrollmentSession!
+    model = EnrollmentSession(contract: contract, candidate: { candidate },
+      request: { endpoint, _, _, _ in
+        XCTAssertEqual(endpoint.path, "/personal")
+        XCTAssertEqual(model.approvalURL?.path, "/personal/login")
+        return self.approved(candidate)
+      }, install: { _, _, _, _, accepted in accepted(); return true })
+    await model.start(endpoint: "https://hub.example/personal")
+    XCTAssertEqual(model.phase, .connected)
+  }
+
   func testFullAdminWrongIdentityAndWrongProfileCannotInstall() async {
     let candidate = EnrollmentCandidate(token: "lt_synthetic")
     for reply in [approved(candidate, scopes: ["full"]), approved(candidate, scopes: ["admin"]),
