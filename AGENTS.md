@@ -29,10 +29,19 @@ Changing it or pushing main can affect the live service.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Current table scopes are dataset-wide; broader access needs explicit approval
   before provisioning. No live native credential is bundled or provisioned.
-- Phone builds require external IOS_DEVELOPMENT_TEAM and IOS_DEVICE_ID values;
-  Ad Hoc release also requires IOS_PROFILE and a usable signing identity.
-  IOS_INSTALL_HOST selects the paired installer Mac. Never open windowed Xcode
-  on the headless build host.
+- Personal Ad Hoc delivery uses `.github/workflows/build-ios.yml`, manual only.
+  `scripts/sign-ios.py` verifies profile, identity and export in a disposable
+  keychain. Only per-dispatch age-encrypted IPA artifacts are uploaded, retained
+  one day. Native checks run signing tests without secrets.
+- Signing uses the approved Apple Signing shared-vault contract: distribution
+  certificate/password and wildcard profile, read by this project's CI account.
+  Apple Signing owns renewal; rotating its material affects its documented Apple
+  app consumers. App runtime never receives it. Project ENV owns IOS_DEVICE_ID
+  and IOS_BUNDLE_ID. This does not authorize broad Life Data access.
+- Install a decrypted, verified CI IPA through `_install`, with IOS_INSTALL_HOST
+  selecting the paired Mac. Local Debug requires IOS_DEVELOPMENT_TEAM and usable
+  development signing; local Release is a stated-reason fallback requiring
+  IOS_PROFILE. Never open windowed Xcode on the headless build host.
 
 ## Architecture rule (the one that matters)
 

@@ -57,15 +57,35 @@ just -f ios/justfile run
 the simulator, and `IOS_DERIVED_DATA` chooses a build directory outside the
 source tree. The default simulator is iPhone 17.
 
-For a phone build, enroll your device and developer account through Apple's
-supported interfaces and supply `IOS_DEVELOPMENT_TEAM` and `IOS_DEVICE_ID`.
-Run `just -f ios/justfile build` for a development install. Set
-`IOS_INSTALL_HOST` to the paired Mac's SSH host when building elsewhere.
-For a release install, supply `IOS_PROFILE`, install a distribution signing
-identity accessible to the build shell, and run `just -f ios/justfile deploy`.
-That exports `ios/build/BirthdayReminders.ipa` before attempting installation.
-Set `IOS_BUNDLE_ID` to the bundle identifier enrolled for your app/profile.
-Never commit team, device or profile values.
+Personal release builds use the manual **Build iOS Ad Hoc** workflow. Configure
+`IOS_DEVICE_ID` and `IOS_BUNDLE_ID` in the project's ENV item, and run bootstrap
+to give this project's CI account the documented Apple Signing vault access.
+The workflow reads the shared distribution certificate and Ad Hoc profile,
+validates that they authorize the selected bundle and device, signs in a
+disposable keychain, and verifies the exported app.
+
+Generate a temporary age identity locally (`age-keygen -o <private-path>`),
+then dispatch with its public recipient as `artifact_recipient`. Keep the
+private identity local. After CI passes, download the encrypted artifact within
+one day, decrypt it locally, verify the IPA SHA256 against the workflow log,
+and put it at `ios/build/BirthdayReminders.ipa`. Never upload a plaintext IPA.
+Remove the temporary identity after decryption and the transfer copies after
+installation. Workflow dispatch requires the workflow to exist on the default
+branch; merging this PR also triggers the existing service deploy and needs
+owner approval.
+
+Install the verified artifact without rebuilding:
+
+```sh
+IOS_INSTALL_HOST=<paired-mac> IOS_DEVICE_ID=<enrolled-device> \
+  just -f ios/justfile _install build/BirthdayReminders.ipa
+```
+
+Local Debug builds require native developer enrollment, accessible signing,
+`IOS_DEVELOPMENT_TEAM`, `IOS_DEVICE_ID`, and `IOS_BUNDLE_ID`; use
+`just -f ios/justfile build`. Local Release signing is a fallback with a stated
+reason and also requires `IOS_PROFILE` and an accessible distribution identity.
+Never commit team, device, profile, or private signing values.
 
 Tests include birthday boundaries, pagination, malformed responses,
 notification reconciliation, Keychain persistence, failed-sync retention,
