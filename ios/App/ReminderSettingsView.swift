@@ -1,4 +1,4 @@
-import BirthdayCore
+import BirthdaysCore
 import SwiftUI
 
 struct ReminderSettingsView: View {

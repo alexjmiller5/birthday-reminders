@@ -1,11 +1,11 @@
-import BirthdayCore
+import BirthdaysCore
 import XCTest
 
-@testable import BirthdayReminders
+@testable import Birthdays
 
 final class ConnectionTests: XCTestCase {
   func testCredentialsSurviveRelaunchAndDisconnectRemovesThem() throws {
-    let service = "birthday-reminders-test-" + UUID().uuidString
+    let service = "birthdays-test-" + UUID().uuidString
     let store = ConnectionStore(service: service)
     defer { try? store.clear() }
     XCTAssertNil(try store.load())

@@ -18,7 +18,7 @@ def test_release_installs_the_ipa_from_the_unique_export_directory(tmp_path):
     programs = {
         "xcodegen": "pass",
         "security": "print('Apple Distribution')",
-        "plutil": "print('com.example.BirthdayReminders')",
+        "plutil": "print('com.example.Birthdays')",
         "xcodebuild": """
 import sys
 from pathlib import Path
@@ -26,7 +26,7 @@ args = sys.argv[1:]
 if '-exportPath' in args:
     export = Path(args[args.index('-exportPath') + 1])
     export.mkdir(parents=True, exist_ok=True)
-    (export / 'BirthdayReminders.ipa').write_bytes(b'signed-test-artifact')
+    (export / 'Birthdays.ipa').write_bytes(b'signed-test-artifact')
 """,
         "xcrun": """
 import sys
@@ -56,4 +56,4 @@ Path('installed').write_text('yes')
     )
     assert result.returncode == 0, result.stdout + result.stderr
     assert (tmp_path / "installed").read_text() == "yes"
-    assert (tmp_path / "build" / "BirthdayReminders.ipa").read_bytes() == b"signed-test-artifact"
+    assert (tmp_path / "build" / "Birthdays.ipa").read_bytes() == b"signed-test-artifact"

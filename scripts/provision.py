@@ -12,7 +12,7 @@ bootstrap saves both fields to 1Password together through JSON stdin.
 import json
 import sys
 
-PROJECT = "birthday-reminders"
+PROJECT = "birthdays"
 FIELDS = ("token-id", "token-secret")
 MAX_ATTEMPTS = 15
 

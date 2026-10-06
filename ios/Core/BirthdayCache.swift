@@ -15,10 +15,23 @@ public struct BirthdaySnapshot: Codable, Equatable, Sendable {
 
 public struct BirthdayCache {
   public let url: URL
-  public init(url: URL) { self.url = url }
+  private let legacyURL: URL?
+  public init(url: URL, legacyURL: URL? = nil) { self.url = url; self.legacyURL = legacyURL }
   public func load() throws -> BirthdaySnapshot? {
-    guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-    return try JSONDecoder().decode(BirthdaySnapshot.self, from: Data(contentsOf: url))
+    if FileManager.default.fileExists(atPath: url.path) {
+      return try JSONDecoder().decode(BirthdaySnapshot.self, from: Data(contentsOf: url))
+    }
+    guard let legacyURL, FileManager.default.fileExists(atPath: legacyURL.path) else { return nil }
+    let snapshot = try JSONDecoder().decode(BirthdaySnapshot.self, from: Data(contentsOf: legacyURL))
+    // Preserve offline use if a full disk temporarily prevents migration.
+    if (try? save(snapshot)) != nil {
+      try? FileManager.default.removeItem(at: legacyURL)
+      let directory = legacyURL.deletingLastPathComponent()
+      if (try? FileManager.default.contentsOfDirectory(atPath: directory.path).isEmpty) == true {
+        try? FileManager.default.removeItem(at: directory)
+      }
+    }
+    return snapshot
   }
   public func save(_ snapshot: BirthdaySnapshot) throws {
     try FileManager.default.createDirectory(
@@ -31,8 +44,10 @@ public struct BirthdayCache {
     #endif
   }
   public func clear() throws {
-    if FileManager.default.fileExists(atPath: url.path) {
-      try FileManager.default.removeItem(at: url)
+    for location in [url, legacyURL].compactMap({ $0 }) {
+      if FileManager.default.fileExists(atPath: location.path) {
+        try FileManager.default.removeItem(at: location)
+      }
     }
   }
 }

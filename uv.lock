@@ -139,7 +139,7 @@ wheels = [
 ]
 
 [[package]]
-name = "birthday-reminders"
+name = "birthdays"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [

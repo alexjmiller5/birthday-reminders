@@ -1,5 +1,5 @@
 [project]
-name = "birthday-reminders"
+name = "birthdays"
 version = "0.1.0"
 description = "Opt-in birthday reminders sourced from the Notion People DB with iOS push and auto-created tasks"
 requires-python = ">=3.13"

@@ -1,6 +1,6 @@
 # iOS app standard verbs (see global AGENTS.md)
 
-app := "BirthdayReminders"
+app := "Birthdays"
 derived_data := env_var_or_default("IOS_DERIVED_DATA", env_var("HOME") + "/Library/Developer/Xcode/DerivedData/" + app)
 test_destination := env_var_or_default("IOS_TEST_DESTINATION", "platform=iOS Simulator,name=iPhone 17")
 # ssh host of the Mac the phone is paired to; empty = install from this Mac
@@ -88,7 +88,7 @@ build: gen
       -destination "generic/platform=iOS" \
       -configuration Debug \
       CODE_SIGN_STYLE=Automatic \
-      BIRTHDAY_BUNDLE_ID="${IOS_BUNDLE_ID:-com.example.BirthdayReminders}" \
+      BIRTHDAY_BUNDLE_ID="${IOS_BUNDLE_ID:-com.example.Birthdays}" \
       DEVELOPMENT_TEAM="$IOS_DEVELOPMENT_TEAM" \
       -allowProvisioningUpdates \
       build
@@ -112,7 +112,7 @@ deploy: gen
       -archivePath "$archive" \
       CODE_SIGN_STYLE=Manual \
       CODE_SIGN_IDENTITY="Apple Distribution" \
-      BIRTHDAY_BUNDLE_ID="${IOS_BUNDLE_ID:-com.example.BirthdayReminders}" \
+      BIRTHDAY_BUNDLE_ID="${IOS_BUNDLE_ID:-com.example.Birthdays}" \
       DEVELOPMENT_TEAM="$IOS_DEVELOPMENT_TEAM" \
       clean archive
     bundle=$(plutil -extract CFBundleIdentifier raw -o - "$archive/Products/Applications/{{app}}.app/Info.plist")

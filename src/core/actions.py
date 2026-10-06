@@ -78,7 +78,7 @@ def create_birthday_task(
             "Tags": {"multi_select": [{"name": "Chore"}]},
             "Due Date": {"date": {"start": today.isoformat()}},
             "Project": {"relation": [{"id": project_page_id}]},
-            "Notes": {"rich_text": [{"text": {"content": "Auto-created by birthday-reminders"}}]},
+            "Notes": {"rich_text": [{"text": {"content": "Auto-created by birthdays"}}]},
         },
     }
     resp = httpx.post(_PAGES_URL, headers=headers, json=payload, timeout=30)

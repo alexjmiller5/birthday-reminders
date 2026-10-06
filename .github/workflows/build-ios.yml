@@ -33,8 +33,8 @@ jobs:
           IOS_CERTIFICATE_P12_BASE64: op://Apple Signing/Apple Distribution Cert/p12_base64
           IOS_CERTIFICATE_PASSWORD: op://Apple Signing/Apple Distribution Cert/password
           IOS_PROFILE_BASE64: op://Apple Signing/Wildcard Ad Hoc Profile/mobileprovision_base64
-          IOS_DEVICE_ID: op://Birthday Reminders/Birthday Reminders ENV/IOS_DEVICE_ID
-          IOS_BUNDLE_ID: op://Birthday Reminders/Birthday Reminders ENV/IOS_BUNDLE_ID
+          IOS_DEVICE_ID: op://Birthdays/Birthdays ENV/IOS_DEVICE_ID
+          IOS_BUNDLE_ID: op://Birthdays/Birthdays ENV/IOS_BUNDLE_ID
       - name: Archive and verify
         run: |
           : "${IOS_DEVICE_ID:?Set the selected device in the project ENV item}"
@@ -45,10 +45,12 @@ jobs:
           bundle = os.environ["IOS_BUNDLE_ID"]
           if not re.fullmatch(r"[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", bundle):
               raise SystemExit("A valid app bundle identifier is required")
-          Path(os.environ["XCODE_XCCONFIG_FILE"]).write_text(f"BIRTHDAY_BUNDLE_ID = {bundle}\n")
+          build = f"{int(os.environ['GITHUB_RUN_NUMBER'])}.{int(os.environ['GITHUB_RUN_ATTEMPT'])}"
+          Path(os.environ["XCODE_XCCONFIG_FILE"]).write_text(
+              f"BIRTHDAY_BUNDLE_ID = {bundle}\nCURRENT_PROJECT_VERSION = {build}\n")
           PYCONFIG
           "$(realpath "$(command -v xcodegen)")" generate --spec ios/project.yml
-          python3 scripts/sign-ios.py --project ios/BirthdayReminders.xcodeproj --scheme BirthdayReminders --output "$RUNNER_TEMP/ios-output"
+          python3 scripts/sign-ios.py --project ios/Birthdays.xcodeproj --scheme Birthdays --output "$RUNNER_TEMP/ios-output"
       - name: Encrypt IPA
         run: |
           age --encrypt --recipient "$ARTIFACT_RECIPIENT" --output "$RUNNER_TEMP/ios-output/App.ipa.age" "$RUNNER_TEMP/ios-output/App.ipa"

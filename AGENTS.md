@@ -2,7 +2,8 @@
 
 The native iOS app lives in `ios/`. It reads birthdays through Life Data's
 supported API and schedules its own local notifications. `Package.swift`
-exposes the dependency-free `BirthdayCore` library for fast macOS tests.
+exposes `BirthdaysCore` for fast macOS tests. Its enrollment policy bundles
+the reviewed Life Core public entry into the system JavaScriptCore framework.
 
 The Python service in `app.py` remains a separately deployed daily Modal
 cron (9am America/New_York), currently reading Notion and sending ntfy.
@@ -10,25 +11,49 @@ Changing it or pushing main can affect the live service.
 
 ## Native app
 
+The shipped bundle ID is `com.alexmiller.birthday-reminders`. Keep it stable
+for installed identity and Keychain continuity. Task occurrence IDs and their
+application namespace are stable across display-name changes.
+
 - `ios/project.yml` owns the generated Xcode project; never edit `.xcodeproj`.
 - `ios/Core/`: date validation, reminder planning, paginated Life Data reads,
   atomic snapshot cache and notification reconciliation. No SwiftUI imports.
 - `ios/App/`: SwiftUI, Keychain, UserNotifications, application lifecycle.
-- Run `swift test --scratch-path /tmp/birthday-reminders-swift-build` for core
+- Run `swift test --scratch-path /tmp/birthdays-swift-build` for core
   tests, `just -f ios/justfile test` for Keychain/model/UI tests, and
   `just -f ios/justfile run` for the simulator. Derived data stays outside iCloud.
-- Credentials belong in this app's Keychain, never the bundle, defaults or
-  fixtures. Endpoint and source mapping are supplied through the connection UI.
+- Enrollment UX is URL plus explicit browser approval, never manual token entry.
+  `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
+  bounded polling and generation/deadline fencing. `CoreEnrollmentPolicy` runs
+  the pinned canonical policy resource; provenance is in `docs/enrollment-policy.md`.
+  Production uses configured profile `birthdays-reader-v1` with exactly
+  the five People read-column grants declared in `ConnectionView`. Never substitute Life UI's full-replica `/login` contract.
+- Credentials belong in this app's device-only Keychain, never the bundle,
+  defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
+  phone People read and Tasks writer use separate identities. Candidate cleanup
+  uses POST `/v1/session`; only `{logged_out:true}` proves revocation, not 401.
+- An approved installer must check its enrollment attempt before committing.
+  Save the cache before replacing Keychain; failed/canceled enrollment preserves
+  the previously accepted connection. Notification testing needs no enrollment.
 - Source opt-ins come from Life Data. Mutes are per-phone preferences.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
-- Life Data task creation is not implemented. Implement against its actual
-  published catalog contract; never create provisional task tables or fall
-  back to writing Notion from the native app.
+- `src/core/life_tasks.py` plans Tasks rows against the published catalog and
+  calls `/v1/rows/insert`. It is not connected to the cron. Live activation
+  requires narrow enrollment, complete People reads, reviewed historical
+  occurrence mappings and explicit creation policy. Never use a provisional
+  table or write Notion as a native fallback.
+- Task IDs use the durable application namespace in `life_tasks.py`, UUIDv5
+  over UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`, with
+  byte-exact person IDs. Preserve retained occurrence mappings first. Keep
+  birthday due dates as calendar labels; edit timestamps do not alter identity.
+  Never rotate the namespace with credentials or overwrite existing tasks.
 - Consumer access uses dedicated Life Data credentials through its API only.
-  Current table scopes are dataset-wide; broader access needs explicit approval
-  before provisioning. No live native credential is bundled or provisioned.
+  Exact-table grants are whole-table grants, not enforced column projection.
+  Birthday-field read enrollment is configured. Create-only Tasks enrollment
+  remains pending.
+  No live consumer credential is bundled or provisioned; no broad fallback.
 - Personal Ad Hoc delivery uses `.github/workflows/build-ios.yml`, manual only.
   `scripts/sign-ios.py` verifies profile, identity and export in a disposable
   keychain. Only per-dispatch age-encrypted IPA artifacts are uploaded, retained
@@ -91,14 +116,14 @@ vault. The operator opens the stderr approval URL in the configured remote
 browser session (agents use chrome-control) and approves its code. Do not
 use `modal token new` or write a temporary credential config.
 
-Birthday Reminders owns its Modal app, runtime Secret, daily schedule, and
+Birthdays owns its Modal app, runtime Secret, daily schedule, and
 independently minted CI token. The CI token is stored only in its project
 vault. Modal Starter personal tokens retain workspace-level permissions;
 this accepted provider limitation allows independent rotation but does not
 enforce access to just this app. Environment-scoped service users require
 [Team or Enterprise](https://modal.com/docs/guide/service-users).
 
-All runtime variables come from `Birthday Reminders ENV`; `.env.tpl`
+All runtime variables come from `Birthdays ENV`; `.env.tpl`
 references its five env-named fields. The separate CI Modal item never
 reaches the runtime. The app's own Notion integration has Read and Insert
 content capabilities for People, Tasks, and its specific project page;

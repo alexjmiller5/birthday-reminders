@@ -1,4 +1,4 @@
-name: BirthdayReminders
+name: Birthdays
 options:
   deploymentTarget:
     iOS: "17.0"
@@ -11,20 +11,21 @@ settings:
       ENABLE_TESTABILITY: YES
       SWIFT_OPTIMIZATION_LEVEL: "-Onone"
 packages:
-  BirthdayCore:
+  BirthdaysCore:
     path: ..
 targets:
-  BirthdayReminders:
+  Birthdays:
     type: application
     platform: iOS
     sources: [App]
     dependencies:
-      - package: BirthdayCore
+      - package: BirthdaysCore
     settings:
       base:
-        BIRTHDAY_BUNDLE_ID: com.example.BirthdayReminders
+        BIRTHDAY_BUNDLE_ID: com.example.Birthdays
         PRODUCT_BUNDLE_IDENTIFIER: $(BIRTHDAY_BUNDLE_ID)
-        PRODUCT_NAME: BirthdayReminders
+        PRODUCT_NAME: Birthdays
+        CURRENT_PROJECT_VERSION: "1"
         CODE_SIGN_STYLE: Automatic
         TARGETED_DEVICE_FAMILY: "1"
         GENERATE_INFOPLIST_FILE: YES
@@ -35,34 +36,35 @@ targets:
     info:
       path: App/Info.plist
       properties:
-        CFBundleDisplayName: Birthday Reminders
+        CFBundleDisplayName: Birthdays
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         UILaunchScreen: {}
         ITSAppUsesNonExemptEncryption: false
-  BirthdayRemindersTests:
+  BirthdaysTests:
     type: bundle.unit-test
     platform: iOS
     sources: [AppTests]
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.BirthdayReminders.Tests
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.Birthdays.Tests
     dependencies:
-      - target: BirthdayReminders
-      - package: BirthdayCore
-  BirthdayRemindersUITests:
+      - target: Birthdays
+      - package: BirthdaysCore
+  BirthdaysUITests:
     type: bundle.ui-testing
     platform: iOS
     sources: [UITests]
     settings:
       base:
         GENERATE_INFOPLIST_FILE: YES
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.BirthdayReminders.UITests
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.Birthdays.UITests
     dependencies:
-      - target: BirthdayReminders
+      - target: Birthdays
 schemes:
-  BirthdayReminders:
+  Birthdays:
     build:
       targets:
-        BirthdayReminders: all
+        Birthdays: all
     test:
-      targets: [BirthdayRemindersTests, BirthdayRemindersUITests]
+      targets: [BirthdaysTests, BirthdaysUITests]

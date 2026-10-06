@@ -1,6 +1,6 @@
 import XCTest
 
-@testable import BirthdayCore
+@testable import BirthdaysCore
 
 private actor TestStore: NotificationStore {
   var ids: Set<String> = ["birthday-stale", "test-notification"]
