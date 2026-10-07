@@ -18,7 +18,7 @@ private final class OptInProtocol: URLProtocol {
 }
 
 @MainActor final class OptInModelTests: XCTestCase {
-  private func checkSave(_ response: Int) async throws {
+  private func checkSave(_ response: Int, cacheFailure: Bool = false) async throws {
     let id = UUID().uuidString
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(id)
     let cache = BirthdayCache(url: directory.appendingPathComponent("cache.json"))
@@ -51,16 +51,24 @@ private final class OptInProtocol: URLProtocol {
       return (200, #"{"rows":[{"id":"p1","name":"<person-1>","birthday":"--01-01","notify_birthday":1,"deleted_at":null,"updated_at":"2030-01-02T00:00:00.000Z","hub_at":"2030-01-02T00:00:00.000Z"}],"next_cursor":null}"#)
     }
     let model = BirthdayModel(cache: cache, credentials: store, defaults: defaults, session: session)
+    if cacheFailure {
+      try FileManager.default.removeItem(at: directory)
+      try Data("storage blocked".utf8).write(to: directory)
+    }
     await model.setOptIn(person, enabled: true)
+    let settled = response == 200 && !cacheFailure
     XCTAssertEqual(writes, 1)
     XCTAssertEqual(model.snapshot?.people.first?.enabled, response == 200)
-    XCTAssertEqual(model.needsOptInRefresh, response != 200)
+    XCTAssertEqual(model.needsOptInRefresh, !settled)
     XCTAssertFalse(model.busy); XCTAssertNil(model.savingPersonID)
-    XCTAssertEqual(model.error == nil, response == 200)
+    XCTAssertEqual(model.error == nil, settled)
     let reopened = BirthdayModel(cache: cache, credentials: store, defaults: defaults, session: session)
-    XCTAssertEqual(reopened.needsOptInRefresh, response != 200)
-    XCTAssertEqual(reopened.snapshot?.people.first?.enabled, response == 200)
-    if response != 200 {
+    XCTAssertEqual(reopened.needsOptInRefresh, !settled)
+    if cacheFailure {
+      XCTAssertNil(reopened.snapshot)
+      try FileManager.default.removeItem(at: directory)
+    } else { XCTAssertEqual(reopened.snapshot?.people.first?.enabled, response == 200) }
+    if !settled {
       await reopened.setOptIn(person, enabled: true)
       XCTAssertEqual(writes, 1)
       await reopened.refresh()
@@ -75,4 +83,5 @@ private final class OptInProtocol: URLProtocol {
   func testConfirmedSavePersistsSharedFlag() async throws { try await checkSave(200) }
   func testConflictPreservesChoiceUntilRefresh() async throws { try await checkSave(409) }
   func testLostAcknowledgmentPersistsRefreshGateWithoutRetry() async throws { try await checkSave(0) }
+  func testConfirmedWriteWithCacheFailureKeepsRefreshGate() async throws { try await checkSave(200, cacheFailure: true) }
 }
