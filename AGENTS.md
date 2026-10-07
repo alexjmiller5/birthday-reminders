@@ -56,9 +56,10 @@ application namespace are stable across display-name changes.
   attribution. Errors stop requests and retain earlier validated receipts.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
-  Birthday-field read enrollment is configured. Create-only Tasks enrollment
-  remains pending.
-  No live consumer credential is bundled or provisioned; no broad fallback.
+  The phone reader and daily Tasks writer enroll independently. The writer's
+  exact policy-bound create grant and five People read-column grants must pass
+  canonical live session validation before use. Credentials are never bundled;
+  provisioning does not activate the cron. No broad fallback.
 - Personal Ad Hoc delivery uses `.github/workflows/build-ios.yml`, manual only.
   `scripts/sign-ios.py` verifies profile, identity and export in a disposable
   keychain. Only per-dispatch age-encrypted IPA artifacts are uploaded, retained

@@ -74,7 +74,8 @@ presence only and never claims that this caller created the row.
 The adapter defaults to Life Core's pinned canonical Python validator through
 an injectable boundary; no handwritten fallback exists. The
 [policy provenance](docs/creation-policy.md) records the exact library pin.
-Activation awaits separately verified configured policy and credential receipts.
+Activation requires separately verified configured policy and credential receipts;
+credential provisioning alone does not enable daily creation.
 
 Before connecting the daily cron, establish narrow caller enrollment, complete
 People reads, historical dedupe coverage, the service's lineage contract, and

@@ -13,7 +13,7 @@ requirement in the task writer.
 `40ce1fb59bfe27a26bc878b193d694414c3b491fdc365cb421a96000b6b1c3a0`.
 Core independently verifies cross-language parity and actual Worker receipts.
 
-Tests use the prospective public policy `birthdays-tasks-v1`, revision
+Tests use the public policy `birthdays-tasks-v1`, revision
 `8231fa18788c8a475e08a1e788623c1d94872961636afff2e0924396a7fbd68c`.
 That service policy allows only `title`, `due_date`, and `person_ids`; namespace,
 source kind, integer occurrence and origin are fixed service-side. Test coverage
