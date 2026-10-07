@@ -60,7 +60,10 @@ import XCTest
   }
 
   func testConflictOfflineAndMalformedReceiptsNeverRetryOrClaimSuccess() async throws {
-    for response in [(409, "{}"), (200, "{}"), (200, #"{"id":"other","revision":{"updated_at":"x","hub_at":"x"}}"#), (200, #"{"id":"p1","revision":{"updated_at":"x","hub_at":"x"}}"#), (0, "")] {
+    let unchanged = #"{"id":"p1","revision":{"updated_at":"2030-01-01T00:00:00.000Z","hub_at":"2030-01-01T00:00:01.000Z"}}"#
+    let older = #"{"id":"p1","revision":{"updated_at":"2029-01-01T00:00:00.000Z","hub_at":"2030-01-01T00:00:01.000Z"}}"#
+    let accepted = #"{"id":"p1","revision":{"updated_at":"2030-01-02T00:00:00.000Z","hub_at":"2030-01-02T00:00:01.000Z"}}"#
+    for response in [(409, "{}"), (200, "{}"), (200, unchanged), (200, older), (202, accepted), (200, #"{"id":"other","revision":{"updated_at":"x","hub_at":"x"}}"#), (200, #"{"id":"p1","revision":{"updated_at":"x","hub_at":"x"}}"#), (0, "")] {
       var requests = 0
       StubProtocol.handler = { _ in
         requests += 1
