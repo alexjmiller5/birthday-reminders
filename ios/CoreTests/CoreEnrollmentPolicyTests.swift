@@ -12,6 +12,21 @@ import XCTest
      "capabilities": ["row_api": "v1", "schema": "none", "replica_sync": false]]
   }
 
+  func testEditorRequiresExactFieldGrantAndConditionalPatchCapability() async throws {
+    let contract = try BirthdaysAccess.editorContract()
+    let path = try await contract.approvalPath(fingerprint)
+    XCTAssertTrue(path.contains("profile=birthdays-editor-v1"))
+    var value = session
+    value["scopes"] = BirthdaysAccess.editorScopes
+    value["enrollmentProfile"] = ["id": BirthdaysAccess.editorProfile, "revision": revision]
+    do { _ = try await contract.validate(value); XCTFail("Missing patch capability accepted") } catch {}
+    value["capabilities"] = ["row_api": "v1", "schema": "none", "replica_sync": false, "conditional_patch": "revision-v1"]
+    let receipt = try await contract.validate(value)
+    XCTAssertEqual(receipt.id, BirthdaysAccess.editorProfile)
+    value["scopes"] = BirthdaysAccess.editorScopes + ["tables:write:people"]
+    do { _ = try await contract.validate(value); XCTFail("Whole-table write accepted") } catch {}
+  }
+
   func testRenamedProductionProfileRejectsRetiredProfileReceipt() async throws {
     let grants = ["tables:read:people:birthday", "tables:read:people:deleted_at", "tables:read:people:id",
                   "tables:read:people:name", "tables:read:people:notify_birthday"]

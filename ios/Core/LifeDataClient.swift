@@ -20,14 +20,14 @@ public final class LifeDataClient: @unchecked Sendable {
     self.token = token
     self.session = session
   }
-  public func people(source: PeopleSource) async throws -> [BirthdayPerson] {
+  public func people(source: PeopleSource, includeRevisions: Bool = false) async throws -> [BirthdayPerson] {
     var people: [String: BirthdayPerson] = [:]
     var seenCursors: Set<String> = []
     var body: [String: Any] = [
       "table": source.table,
       "columns": [
         "id", source.nameColumn, source.birthdayColumn, source.enabledColumn, "deleted_at",
-      ],
+      ] + (includeRevisions ? ["updated_at", "hub_at"] : []),
       "since": "", "limit": 200,
     ]
     while true {
@@ -51,7 +51,8 @@ public final class LifeDataClient: @unchecked Sendable {
         guard enabled == 0 || enabled == 1 || row[source.enabledColumn] is NSNull else {
           throw BirthdayError.invalidResponse
         }
-        people[id] = BirthdayPerson(id: id, name: name, birthday: birthday, enabled: enabled == 1)
+        people[id] = BirthdayPerson(id: id, name: name, birthday: birthday, enabled: enabled == 1,
+          revision: includeRevisions ? try RowRevision.parse(row) : nil)
       }
       if reply["next_cursor"] is NSNull { return people.values.sorted { $0.id < $1.id } }
       guard let cursor = reply["next_cursor"] as? String, !cursor.isEmpty,
@@ -59,6 +60,22 @@ public final class LifeDataClient: @unchecked Sendable {
       else { throw BirthdayError.invalidResponse }
       body["after"] = cursor
     }
+  }
+
+  @MainActor public func setOptIn(_ person: BirthdayPerson, enabled: Bool, source: PeopleSource,
+                                contract: EnrollmentContract) async throws -> BirthdayPerson {
+    guard let revision = person.revision else { throw BirthdayError.invalidResponse }
+    // A cached profile receipt is not current authorization. Validate the exact
+    // live session through the canonical policy before submitting an edit.
+    _ = try await contract.validate(request(path: "v1/session"))
+    let receipt = try await request(path: "v1/rows/patch", body: [
+      "table": source.table, "id": person.id, "values": [source.enabledColumn: enabled ? 1 : 0],
+      "expected_revision": ["updated_at": revision.updatedAt, "hub_at": revision.hubAt as Any? ?? NSNull()],
+    ])
+    guard receipt["id"] as? String == person.id, let next = receipt["revision"] as? [String: Any]
+    else { throw BirthdayError.invalidResponse }
+    return BirthdayPerson(id: person.id, name: person.name, birthday: person.birthday,
+                          enabled: enabled, revision: try RowRevision.parse(next))
   }
 
   private func request(path: String, body: [String: Any]? = nil) async throws -> [String: Any] {

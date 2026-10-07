@@ -6,6 +6,7 @@ struct BirthdayListView: View {
   @Bindable var model: BirthdayModel
   @State private var showConnection = false
   @State private var showSettings = false
+  @State private var showSort = false
 
   var body: some View {
     NavigationStack {
@@ -51,20 +52,39 @@ struct BirthdayListView: View {
                 .font(.footnote).foregroundStyle(.secondary)
             }
           }
-          Section("Upcoming") {
+          if !model.canEditOptIns {
+            Section {
+              Text("Your connection can view birthdays. Approve editing to change notification opt-ins here.")
+                .font(.subheadline).foregroundStyle(.secondary)
+              Button("Enable opt-in editing") { showConnection = true }
+            }
+          }
+          if model.needsOptInRefresh {
+            Section { Button("Refresh notification choices") { Task { await model.refresh() } }.disabled(model.busy) }
+          }
+          Section {
             if model.upcoming.isEmpty {
               Text("No birthdays yet. Add birthdays in Life Data, then pull to refresh.")
                 .foregroundStyle(.secondary)
             }
-            ForEach(model.upcoming) { birthday in
+            if !model.upcoming.isEmpty && model.visibleBirthdays.isEmpty {
+              Text("No matching birthdays.").foregroundStyle(.secondary)
+            }
+            ForEach(model.visibleBirthdays) { birthday in
               BirthdayRow(birthday: birthday, model: model)
             }
+          } header: {
+            Text("Birthdays")
+          } footer: {
+            Text("Notification opt-ins are shared through Life Data. Delivery on this phone also requires notification permission.")
           }
         }
       }
       .navigationTitle("Birthdays")
       .navigationBarTitleDisplayMode(.inline)
+      .searchable(text: $model.search, prompt: "Search by name")
       .toolbar {
+        ToolbarItem(placement: .topBarLeading) { Button("Sort", systemImage: "arrow.up.arrow.down") { showSort = true } }
         ToolbarItem(placement: .topBarTrailing) { Button("Settings") { showSettings = true } }
       }
       .refreshable { await model.refresh() }
@@ -76,6 +96,7 @@ struct BirthdayListView: View {
       }
       .sheet(isPresented: $showConnection) { ConnectionView(model: model) }
       .sheet(isPresented: $showSettings) { ReminderSettingsView(model: model) }
+      .sheet(isPresented: $showSort) { BirthdaySortView(model: model) }
     }
   }
   private func openSettings() {
@@ -99,18 +120,75 @@ private struct BirthdayRow: View {
         )
         .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
       }
-      if birthday.person.enabled {
-        Toggle(
-          "Remind on this phone",
-          isOn: Binding(
-            get: { !model.preferences.mutedIDs.contains(birthday.id) },
-            set: { value in Task { await model.mute(birthday.person, muted: !value) } }
-          )
-        ).font(.subheadline).disabled(model.busy)
-      } else {
-        Text("Not opted in. Enable birthday reminders in Life Data.")
-          .font(.footnote).foregroundStyle(.secondary)
+      Toggle("Birthday notifications", isOn: Binding(
+        get: { birthday.person.enabled },
+        set: { value in Task { await model.setOptIn(birthday.person, enabled: value) } }
+      ))
+      .font(.subheadline)
+      .accessibilityLabel("Birthday notifications for \(birthday.person.name)")
+      .accessibilityIdentifier("opt-in-\(birthday.id)")
+      .disabled(model.busy || !model.canEditOptIns || model.needsOptInRefresh)
+      if model.savingPersonID == birthday.id {
+        ProgressView("Saving to Life Data...").font(.footnote)
+      }
+      if birthday.person.enabled && model.preferences.mutedIDs.contains(birthday.id) {
+        Text("Muted on this phone.").font(.footnote).foregroundStyle(.secondary)
+        Button("Enable on this phone") { Task { await model.mute(birthday.person, muted: false) } }
+          .disabled(model.busy)
       }
     }.padding(.vertical, 5)
+  }
+}
+
+private struct BirthdaySortView: View {
+  @Bindable var model: BirthdayModel
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    NavigationStack {
+      List {
+        Section {
+          ForEach(model.sortRules) { rule in
+            VStack(alignment: .leading, spacing: 6) {
+              Text(rule.field.title).font(.headline)
+              Button(rule.direction, systemImage: "arrow.up.arrow.down") {
+                var rules = model.sortRules
+                if let index = rules.firstIndex(where: { $0.id == rule.id }) {
+                  rules[index].reversed.toggle()
+                  model.saveSortRules(rules)
+                }
+              }
+              .accessibilityLabel("\(rule.field.title): \(rule.direction). Reverse order")
+              .accessibilityIdentifier("sort-direction-\(rule.field.rawValue)")
+            }
+            .deleteDisabled(model.sortRules.count == 1)
+          }
+          .onMove { indices, destination in
+            var rules = model.sortRules
+            rules.move(fromOffsets: indices, toOffset: destination)
+            model.saveSortRules(rules)
+          }
+          .onDelete { indices in
+            var rules = model.sortRules
+            rules.remove(atOffsets: indices)
+            model.saveSortRules(rules)
+          }
+        } header: { Text("Sort in this order") }
+        footer: { Text("Drag to set priority. Tap a direction to reverse it. Notifications sorts the shared Life Data opt-in.") }
+        if model.sortRules.count < BirthdaySortRule.Field.allCases.count {
+          Section {
+            Menu("Add sort rule") {
+              ForEach(BirthdaySortRule.Field.allCases.filter { field in !model.sortRules.contains { $0.field == field } }, id: \.self) { field in
+                Button(field.title) { model.saveSortRules(model.sortRules + [BirthdaySortRule(field)]) }
+              }
+            }
+          }
+        }
+        Section { Button("Reset to upcoming first") { model.saveSortRules(BirthdaySortRule.defaults) } }
+      }
+      .environment(\.editMode, .constant(.active))
+      .navigationTitle("Sort birthdays")
+      .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+    }
   }
 }

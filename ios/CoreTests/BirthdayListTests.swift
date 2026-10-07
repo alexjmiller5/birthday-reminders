@@ -16,7 +16,7 @@ final class BirthdayListTests: XCTestCase {
   func testDefaultUsesOccurrenceDateAcrossYearBoundaryAndStableTies() {
     let rows = [row("b", "<person-b>", 200), row("c", "<person-c>", 100), row("a", "<person-a>", 100)]
     XCTAssertEqual(BirthdayListOrder.apply(rows, rules: BirthdaySortRule.defaults).map(\.id), ["a", "c", "b"])
-    XCTAssertEqual(BirthdayListOrder.apply(rows.reversed(), rules: BirthdaySortRule.defaults).map(\.id), ["a", "c", "b"])
+    XCTAssertEqual(BirthdayListOrder.apply(Array(rows.reversed()), rules: BirthdaySortRule.defaults).map(\.id), ["a", "c", "b"])
   }
 
   func testRulesAreOrderedAndIndividuallyReversible() {
