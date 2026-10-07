@@ -10,6 +10,9 @@ final class BirthdayListUITests: XCTestCase {
     XCTAssertTrue(app.switches["opt-in-fixture-a"].waitForExistence(timeout: 5))
   }
   override func tearDown() {
+    let screenshot = XCTAttachment(screenshot: app.screenshot())
+    screenshot.name = "Final list interaction state"; screenshot.lifetime = .keepAlways; add(screenshot)
+    if testRun?.hasSucceeded == false { print(app.debugDescription) }
     app.terminate()
     app.launchArguments = ["-birthdays-clear-ui-fixture"]
     app.launch()
@@ -27,11 +30,13 @@ final class BirthdayListUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Sort birthdays"].waitForExistence(timeout: 3))
     app.buttons["sort-direction-birthday"].tap()
     XCTAssertTrue(app.buttons["sort-direction-birthday"].label.contains("Latest first"))
-    app.buttons["Add sort rule"].tap()
-    app.buttons["Notifications"].tap()
+    app.descendants(matching: .any).matching(identifier: "Add sort rule").firstMatch.tap()
+    let notifications = app.descendants(matching: .any).matching(identifier: "Notifications").firstMatch
+    XCTAssertTrue(notifications.waitForExistence(timeout: 3))
+    notifications.tap()
     XCTAssertTrue(app.buttons["sort-direction-notifications"].exists)
-    app.buttons["Add sort rule"].tap()
-    app.buttons["Name"].tap()
+    app.descendants(matching: .any).matching(identifier: "Add sort rule").firstMatch.tap()
+    app.descendants(matching: .any).matching(identifier: "Name").firstMatch.tap()
     XCTAssertTrue(app.buttons["sort-direction-name"].exists)
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Combined sort rules"; screenshot.lifetime = .keepAlways; add(screenshot)
@@ -41,6 +46,8 @@ final class BirthdayListUITests: XCTestCase {
   func testSharedToggleSavesAndRefreshPreservesIt() {
     let toggle = app.switches["opt-in-fixture-a"]
     XCTAssertEqual(toggle.value as? String, "0")
+    XCTAssertTrue(toggle.isEnabled)
+    XCTAssertTrue(toggle.isHittable)
     toggle.tap()
     expectation(for: NSPredicate(format: "value == '1'"), evaluatedWith: toggle)
     waitForExpectations(timeout: 5)
