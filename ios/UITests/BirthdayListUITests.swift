@@ -38,7 +38,17 @@ final class BirthdayListUITests: XCTestCase {
     app.buttons["Add sort rule"].buttons.firstMatch.tap()
     app.descendants(matching: .any).matching(identifier: "Name").firstMatch.tap()
     XCTAssertTrue(app.buttons["sort-direction-name"].exists)
-    app.buttons["Reorder Name"].press(forDuration: 1, thenDragTo: app.buttons["Reorder Upcoming birthday"])
+    // SwiftUI exposes these visible drag handles without an XCTest hitpoint.
+    // Derive gesture coordinates from their current accessibility frames.
+    let nameHandle = app.buttons["Reorder Name"]
+    let birthdayHandle = app.buttons["Reorder Upcoming birthday"]
+    XCTAssertTrue(nameHandle.exists && birthdayHandle.exists)
+    let origin = app.coordinate(withNormalizedOffset: .zero)
+    let start = origin.withOffset(CGVector(dx: nameHandle.frame.midX, dy: nameHandle.frame.midY))
+    let end = origin.withOffset(CGVector(dx: birthdayHandle.frame.midX, dy: birthdayHandle.frame.midY))
+    start.press(forDuration: 1, thenDragTo: end)
+    XCTAssertLessThan(app.buttons["sort-direction-name"].frame.minY,
+                      app.buttons["sort-direction-birthday"].frame.minY)
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Combined sort rules"; screenshot.lifetime = .keepAlways; add(screenshot)
     app.buttons["Done"].tap()
