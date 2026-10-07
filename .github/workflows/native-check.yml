@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, native-ios]
   pull_request:
-    paths: ['ios/**', 'Package.swift', '.github/workflows/*.yml', 'scripts/sign*', 'scripts/ios_workflow_test.py']
+    paths: ['ios/**', 'Package.swift', '.github/workflows/*.yml', 'scripts/sign*', 'scripts/ios_workflow_test.py', 'scripts/ios-mutation-test.py']
 
 permissions:
   contents: read

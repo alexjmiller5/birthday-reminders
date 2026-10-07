@@ -5,8 +5,11 @@ by Life Core, with no local policy edits. It exports the public enrollment
 functions only. `CoreEnrollmentPolicy` loads it into JavaScriptCore and passes
 JSON across the realm boundary. New connections expect `birthdays-editor-v1`:
 People id/name/birthday/notify_birthday/deleted_at/updated_at/hub_at reads and
-only `tables:patch:people:notify_birthday`. The profile must be configured by
-the service before release. Existing reader credentials remain read-only.
+only `tables:patch:people:notify_birthday`. Service deploy `37615482143` shipped
+main `7fea375f4ce482623fd13c4a4ef408115d5ea57b`. Configuration deployment
+`5a56ea49-84ea-4cc8-9e9d-c07d93cb3642` has profile revision
+`811fa070c5409e04f27f00b3d8a74b3778d4efd351cafb9dfdba8a20c6e7ede9`.
+Existing reader credentials remain read-only.
 Synthetic tests inject their own expected profile. The phone requires the
 conditional-patch capability and validates the live session before each edit.
 The canonical validator checks exact grants and a valid revision; accepted

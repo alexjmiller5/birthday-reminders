@@ -15,6 +15,7 @@ final class BirthdayModel {
   private(set) var savingPersonID: String?
   private var pendingOptInIDs: Set<String>
   var needsOptInRefresh: Bool { !pendingOptInIDs.isEmpty }
+  func isOptInPending(_ id: String) -> Bool { pendingOptInIDs.contains(id) }
   private(set) var sortRules: [BirthdaySortRule]
   var search = ""
   var visibleBirthdays: [UpcomingBirthday] {

@@ -30,25 +30,27 @@ final class BirthdayListUITests: XCTestCase {
     XCTAssertTrue(app.navigationBars["Sort birthdays"].waitForExistence(timeout: 3))
     app.buttons["sort-direction-birthday"].tap()
     XCTAssertTrue(app.buttons["sort-direction-birthday"].label.contains("Latest first"))
-    app.descendants(matching: .any).matching(identifier: "Add sort rule").firstMatch.tap()
+    app.buttons["Add sort rule"].buttons.firstMatch.tap()
     let notifications = app.descendants(matching: .any).matching(identifier: "Notifications").firstMatch
     XCTAssertTrue(notifications.waitForExistence(timeout: 3))
     notifications.tap()
     XCTAssertTrue(app.buttons["sort-direction-notifications"].exists)
-    app.descendants(matching: .any).matching(identifier: "Add sort rule").firstMatch.tap()
+    app.buttons["Add sort rule"].buttons.firstMatch.tap()
     app.descendants(matching: .any).matching(identifier: "Name").firstMatch.tap()
     XCTAssertTrue(app.buttons["sort-direction-name"].exists)
+    app.buttons["Reorder Name"].press(forDuration: 1, thenDragTo: app.buttons["Reorder Upcoming birthday"])
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Combined sort rules"; screenshot.lifetime = .keepAlways; add(screenshot)
     app.buttons["Done"].tap()
     XCTAssertTrue(app.switches["opt-in-fixture-a"].exists)
+    XCTAssertLessThan(app.switches["opt-in-fixture-a"].frame.minY, app.switches["opt-in-fixture-b"].frame.minY)
   }
   func testSharedToggleSavesAndRefreshPreservesIt() {
     let toggle = app.switches["opt-in-fixture-a"]
     XCTAssertEqual(toggle.value as? String, "0")
     XCTAssertTrue(toggle.isEnabled)
     XCTAssertTrue(toggle.isHittable)
-    toggle.tap()
+    toggle.switches.firstMatch.tap()
     expectation(for: NSPredicate(format: "value == '1'"), evaluatedWith: toggle)
     waitForExpectations(timeout: 5)
     app.swipeDown()
@@ -56,5 +58,8 @@ final class BirthdayListUITests: XCTestCase {
     XCTAssertFalse(app.staticTexts["connection-error"].exists)
     let screenshot = XCTAttachment(screenshot: app.screenshot())
     screenshot.name = "Confirmed shared notification opt-in"; screenshot.lifetime = .keepAlways; add(screenshot)
+    toggle.switches.firstMatch.tap()
+    expectation(for: NSPredicate(format: "value == '0'"), evaluatedWith: toggle)
+    waitForExpectations(timeout: 5)
   }
 }

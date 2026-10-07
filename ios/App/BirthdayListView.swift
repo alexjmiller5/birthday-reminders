@@ -130,6 +130,9 @@ private struct BirthdayRow: View {
       .disabled(model.busy || !model.canEditOptIns || model.needsOptInRefresh)
       if model.savingPersonID == birthday.id {
         ProgressView("Saving to Life Data...").font(.footnote)
+      } else if model.isOptInPending(birthday.id) {
+        Text("Refresh to confirm this choice. Reminders for this person are paused on this phone.")
+          .font(.footnote).foregroundStyle(.secondary)
       }
       if birthday.person.enabled && model.preferences.mutedIDs.contains(birthday.id) {
         Text("Muted on this phone.").font(.footnote).foregroundStyle(.secondary)
@@ -177,10 +180,13 @@ private struct BirthdaySortView: View {
         footer: { Text("Drag to set priority. Tap a direction to reverse it. Notifications sorts the shared Life Data opt-in.") }
         if model.sortRules.count < BirthdaySortRule.Field.allCases.count {
           Section {
-            Menu("Add sort rule") {
+            Menu {
               ForEach(BirthdaySortRule.Field.allCases.filter { field in !model.sortRules.contains { $0.field == field } }, id: \.self) { field in
                 Button(field.title) { model.saveSortRules(model.sortRules + [BirthdaySortRule(field)]) }
               }
+            } label: {
+              Text("Add sort rule").frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
           }
         }

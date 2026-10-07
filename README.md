@@ -33,7 +33,9 @@ Birthdays may be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. The list's
 **Birthday notifications** toggle updates only `notify_birthday` in Life Data.
 It shows the confirmed choice after saving, then reschedules this phone.
 Concurrent edits and uncertain saves require a refresh before another attempt;
-they are never automatically retried. Existing read-only connections keep
+they are never automatically retried. Pending changes temporarily suppress
+that person's reminders, including after an offline restart, until refreshed.
+Existing read-only connections keep
 working: choose **Enable opt-in editing** for browser approval with a new
 device credential. Canceling or failing approval preserves the old connection.
 Names and birthday dates remain editable through Life Data. Existing per-phone
