@@ -19,13 +19,19 @@ final class BirthdayListUITests: XCTestCase {
     app.terminate()
   }
   func testSearchAndCombinedSortControls() {
-    let search = app.searchFields.firstMatch
-    if !search.isHittable { app.swipeDown() }
+    let search = app.textFields["Search by name"]
     XCTAssertTrue(search.waitForExistence(timeout: 3))
+    let sort = app.buttons["Sort"]
+    XCTAssertTrue(search.isHittable && sort.isHittable)
+    XCTAssertGreaterThan(search.frame.minY, app.frame.height * 0.6)
+    XCTAssertLessThan(search.frame.maxX, sort.frame.minX)
+    XCTAssertEqual(search.frame.midY, sort.frame.midY, accuracy: 24)
+    let controls = XCTAttachment(screenshot: app.screenshot())
+    controls.name = "Bottom search beside sort"; controls.lifetime = .keepAlways; add(controls)
     search.tap(); search.typeText("PERSON-A")
     XCTAssertTrue(app.switches["opt-in-fixture-a"].exists)
     XCTAssertFalse(app.switches["opt-in-fixture-b"].exists)
-    app.buttons["Cancel"].tap()
+    app.buttons["Clear search"].tap()
     app.buttons["Sort"].tap()
     XCTAssertTrue(app.navigationBars["Sort birthdays"].waitForExistence(timeout: 3))
     app.buttons["sort-direction-birthday"].tap()

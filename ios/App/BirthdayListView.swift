@@ -82,15 +82,13 @@ struct BirthdayListView: View {
       }
       .navigationTitle("Birthdays")
       .navigationBarTitleDisplayMode(.inline)
-      .searchable(text: $model.search, prompt: "Search by name")
       .toolbar {
-        ToolbarItemGroup(placement: .bottomBar) {
-          Spacer()
-          Button("Sort", systemImage: "arrow.up.arrow.down") { showSort = true }
-            .labelStyle(.iconOnly)
-        }
         ToolbarItem(placement: .topBarTrailing) { Button("Settings") { showSettings = true } }
       }
+      .safeAreaInset(edge: .bottom, spacing: 0) {
+        BirthdayListControls(search: $model.search) { showSort = true }
+      }
+      .scrollDismissesKeyboard(.interactively)
       .refreshable { await model.refresh() }
       .overlay {
         if model.busy {
@@ -105,6 +103,47 @@ struct BirthdayListView: View {
   }
   private func openSettings() {
     if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
+  }
+}
+
+private struct BirthdayListControls: View {
+  @Binding var search: String
+  let showSort: () -> Void
+  @FocusState private var searching: Bool
+
+  var body: some View {
+    HStack(spacing: 12) {
+      HStack(spacing: 8) {
+        Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+          .accessibilityHidden(true)
+        TextField("Search by name", text: $search)
+          .textInputAutocapitalization(.never)
+          .autocorrectionDisabled()
+          .submitLabel(.search)
+          .focused($searching)
+          .onSubmit { searching = false }
+          .frame(minHeight: 44)
+        if !search.isEmpty {
+          Button("Clear search", systemImage: "xmark.circle.fill") { search = "" }
+            .labelStyle(.iconOnly)
+            .foregroundStyle(.secondary)
+            .frame(minWidth: 44, minHeight: 44)
+        }
+      }
+      .padding(.leading, 14)
+      .padding(.trailing, search.isEmpty ? 14 : 0)
+      .background(Color(uiColor: .tertiarySystemFill), in: Capsule())
+      Button("Sort", systemImage: "arrow.up.arrow.down") {
+        searching = false
+        showSort()
+      }
+      .labelStyle(.iconOnly)
+      .frame(width: 44, height: 44)
+      .background(.thinMaterial, in: Circle())
+    }
+    .padding(.horizontal, 16)
+    .padding(.vertical, 8)
+    .background(.bar)
   }
 }
 
