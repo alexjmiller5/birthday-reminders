@@ -5,9 +5,8 @@ supported API and schedules its own local notifications. `Package.swift`
 exposes `BirthdaysCore` for fast macOS tests. Its enrollment policy bundles
 the reviewed Life Core public entry into the system JavaScriptCore framework.
 
-The Python service in `app.py` remains a separately deployed daily Modal
-cron (9am America/New_York), currently reading Notion and sending ntfy.
-Changing it or pushing main can affect the live service.
+The Python Life Data Tasks adapter is dormant. There is no server entrypoint,
+active birthday cron or automatic deployment workflow. Main pushes run checks.
 
 ## Native app
 
@@ -80,63 +79,24 @@ application namespace are stable across display-name changes.
   development signing; local Release is a stated-reason fallback requiring
   IOS_PROFILE. Never open windowed Xcode on the headless build host.
 
-## Architecture rule (the one that matters)
+## Python Tasks adapter
 
-**Business logic lives in `src/core/` as plain Python with NO Modal imports.**
-Only `app.py` imports `modal` - it is the deployment shim (image, secrets,
-endpoints, schedules). This keeps the logic portable: the same `core` package
-runs in tests, on the mac mini via launchd, or on any future platform.
+Business logic lives in `src/core/` as plain Python with no provider runtime
+imports. `life_tasks.py` is a library, not an active task-writing job. Activation
+requires the verified dedupe and scoped service contracts above, plus an explicit
+runtime implementation. Never add a Notion or ntfy fallback.
 
-- No HTTP endpoints: the template webhook + spawned worker were deleted as
-  unused. If one comes back, it MUST use `requires_proxy_auth=True` - never
-  expose an unauthenticated endpoint.
-- Cron: Modal is the PREFERRED home for schedules - but the Starter plan
-  allows **5 deployed crons across ALL apps**, so track the budget. Overflow
-  goes to GHA cron or CF Cron Triggers (see the `infra` skill).
+## Stack and commands
 
-## Stack
+uv, httpx, pinned Life Core validators, pytest and ruff. Run `just test`,
+`just check` and `just fmt` for tests, read-only checks and formatting.
+Write tests before changing the adapter. Use the native justfile for app builds
+and installation. Native releases remain manually dispatched; CI does not
+activate server-side tasks.
 
-uv · pydantic-settings (env config) · httpx · structlog · pytest · ruff.
-Config comes from env vars only: Modal Secret in the cloud, `op run` locally.
-`.env.tpl` is the canonical secrets manifest (op:// refs, committed).
-Instantiate `Settings()` inside functions, never at import time.
+## Credentials
 
-## Commands
-
-Standard verb set (see global AGENTS.md) - the justfile is the interface,
-not a script catalog; one-offs go in `scripts/` and run directly.
-
-| Command | Purpose |
-|---|---|
-| `just dev` | Live-reload dev against real Modal infra (`modal serve`) |
-| `just test` / `just check` / `just fmt` | pytest / ruff read-only / ruff fix |
-| `just logs` | Stream deployed-app logs |
-| `just sync-secrets` | Push `.env.tpl` → Modal secret store |
-| `just deploy` | test + sync-secrets + `modal deploy` |
-
-## TDD
-
-Write the test in `tests/` first, then the `src/core/` code. `app.py` shim
-functions stay thin enough to not need tests.
-
-## Credential provisioning
-
-`scripts/provision.py` implements `--list`, `--batches`, and
-`--batch modal-token` for `op-project-bootstrap`. Modal CI credentials are
-minted and verified as a pair in memory, then saved atomically to the project
-vault. The operator opens the stderr approval URL in the configured remote
-browser session (agents use chrome-control) and approves its code. Do not
-use `modal token new` or write a temporary credential config.
-
-Birthdays owns its Modal app, runtime Secret, daily schedule, and
-independently minted CI token. The CI token is stored only in its project
-vault. Modal Starter personal tokens retain workspace-level permissions;
-this accepted provider limitation allows independent rotation but does not
-enforce access to just this app. Environment-scoped service users require
-[Team or Enterprise](https://modal.com/docs/guide/service-users).
-
-All runtime variables come from `Birthdays ENV`; `.env.tpl`
-references its five env-named fields. The separate CI Modal item never
-reaches the runtime. The app's own Notion integration has Read and Insert
-content capabilities for People, Tasks, and its specific project page;
-Update content, comments, and user information are disabled.
+`.env.tpl` contains no server runtime secrets while the Tasks writer is dormant.
+The separate writer identity must stay narrowly scoped and must never be reused
+by the phone. Project signing inputs are declared in the manual iOS workflow;
+provider credentials never reach the native app or the Tasks library.

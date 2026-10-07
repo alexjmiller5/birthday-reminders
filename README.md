@@ -1,8 +1,8 @@
 # Birthdays
 
 Native iPhone birthday reminders backed by Life Data, with notifications
-scheduled on the phone. The Python service in this repository is a separate
-Notion/ntfy deployment and is not used by the native app.
+scheduled on the phone. There is no active server-side birthday job. The Python
+Life Data Tasks adapter is tested but not connected to a scheduler.
 
 ## Native app
 
@@ -125,8 +125,7 @@ one day, decrypt it locally, verify the IPA SHA256 against the workflow log,
 and put it at `ios/build/Birthdays.ipa`. Never upload a plaintext IPA.
 Remove the temporary identity after decryption and the transfer copies after
 installation. Workflow dispatch requires the workflow to exist on the default
-branch; merging this PR also triggers the existing service deploy and needs
-owner approval.
+branch. Pushes to main run native and Python checks; releases are manual.
 
 Install the verified artifact without rebuilding:
 
@@ -147,64 +146,19 @@ onboarding and real simulator notification delivery after leaving the app.
 The icon uses [Tabler gift](https://api.iconify.design/tabler:gift.svg), MIT;
 license included in `ios/App/Tabler-LICENSE.txt`.
 
-## Python service
+## Python Tasks adapter
 
-`app.py` deploys the daily Modal cron; `src/core/` contains its Python logic.
-`just test` and `just check` run pytest and ruff. Pushing `main` runs its deploy
-workflow. Keep it running until the native replacement and task writer are
-verified and the service change is authorized.
+`src/core/life_tasks.py` contains the dormant task planner and creation adapter.
+`just test` and `just check` run pytest and ruff. There is no server entrypoint,
+cron, automatic deployment workflow or notification service in this repository.
+Task-writer activation requires the readiness checks described above and a new,
+explicitly configured runtime. Phone notifications work independently.
 
 ## Secrets
 
-`.env.tpl` is the canonical manifest - op:// references into the project's
-1Password vault only. All five runtime fields live in its single
-`Birthdays ENV` item:
-
-- `NOTION_API_KEY` - this app's own Notion integration with Read and Insert
-  content capabilities, access to the People and Tasks databases, and access
-  to the specific project page used by its task relation
-- `NTFY_TOPIC` - ntfy topic for iOS push, `<random-topic>`. Generate one
-  (e.g. `openssl rand -base64 18 | tr -d '+/='`) - random topics are
-  ntfy.sh's only access control, so anyone who knows the topic can read it;
-  treat it like a password and rotate it if it ever leaks
-- `PEOPLE_DATA_SOURCE_ID` - Notion data source id of the People DB
-- `TASKS_DATA_SOURCE_ID` - Notion data source id of the Tasks DB
-- `PROJECT_PAGE_ID` - Notion page id of the project the created tasks
-  relate to
-
-Local dev: `op run --env-file=.env.tpl -- <cmd>`. Cloud: `just sync-secrets`
-pushes to the Modal secret store.
-
-## Manual setup
-
-Run bootstrap with your repository name. This repo's `.env.tpl` uses the
-vault name `Birthdays`:
-
-```bash
-op-project-bootstrap .env.tpl --repo <owner>/<repo>
-```
-
-Bootstrap reads `.env.tpl` and the deploy workflow to create the project
-vault, environment item, dedicated Modal CI token, and read-only CI service
-account. Fill the environment fields with this project's own credentials.
-
-`scripts/provision.py` emits a Modal approval URL and verification code on
-stderr. Open that URL in the configured remote browser session (agents use
-chrome-control) and approve the code. It verifies the new token pair in
-memory; bootstrap saves both fields to `Birthdays CI Modal Token`
-at once through JSON stdin. It never opens a local browser or writes a
-provider config or temporary credential file.
-
-Install the [ntfy iOS app](https://apps.apple.com/app/ntfy/id1625396347) and
-subscribe to the configured `NTFY_TOPIC` topic to receive notifications.
-
-### Required Notion schema
-
-Property names are matched exactly (see `src/core/birthdays.py` and
-`src/core/actions.py`):
-
-- **People DB**: `Name` (title), `Birthday` (date), `Birthday Notifications`
-  (checkbox)
-- **Tasks DB**: `Name` (title), `Due Date` (date), `Priority` (select with a
-  `High` option), `Tags` (multi_select with a `Chore` option), `Project`
-  (relation), `Notes` (rich text)
+The native app uses browser enrollment and its own Keychain credential.
+`.env.tpl` has no runtime secrets while the server-side writer is inactive.
+The manual iOS signing workflow declares its own project-owned signing inputs;
+bootstrap uses those workflow references when configuring CI. Future server
+configuration belongs in the project's ENV item and must use its independently
+revocable, narrowly scoped Life Data writer credential.

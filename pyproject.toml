@@ -1,19 +1,15 @@
 [project]
 name = "birthdays"
 version = "0.1.0"
-description = "Opt-in birthday reminders sourced from the Notion People DB with iOS push and auto-created tasks"
+description = "Life Data birthday task planning and atomic creation adapter"
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28",
     "life-data",
-    "pydantic>=2.10",
-    "pydantic-settings>=2.7",
-    "structlog>=25.1",
 ]
 
 [dependency-groups]
 dev = [
-    "modal>=1.0",
     "pytest>=8.3",
     "pytest-mock>=3.14",
     "ruff>=0.9",
