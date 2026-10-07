@@ -84,7 +84,11 @@ struct BirthdayListView: View {
       .navigationBarTitleDisplayMode(.inline)
       .searchable(text: $model.search, prompt: "Search by name")
       .toolbar {
-        ToolbarItem(placement: .topBarLeading) { Button("Sort", systemImage: "arrow.up.arrow.down") { showSort = true } }
+        ToolbarItemGroup(placement: .bottomBar) {
+          Spacer()
+          Button("Sort", systemImage: "arrow.up.arrow.down") { showSort = true }
+            .labelStyle(.iconOnly)
+        }
         ToolbarItem(placement: .topBarTrailing) { Button("Settings") { showSettings = true } }
       }
       .refreshable { await model.refresh() }
