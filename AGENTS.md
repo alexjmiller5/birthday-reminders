@@ -40,15 +40,20 @@ application namespace are stable across display-name changes.
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
 - `src/core/life_tasks.py` plans Tasks rows against the published catalog and
-  calls `/v1/rows/insert`. It is not connected to the cron. Live activation
-  requires narrow enrollment, complete People reads, reviewed historical
-  occurrence mappings and explicit creation policy. Never use a provisional
+  calls `/v1/rows/create` with the pinned canonical Life Core Python validator.
+  It is not connected to the cron. Live activation requires the exact configured
+  policy/credential receipt, complete People reads,
+  reviewed historical occurrence mappings and explicit creation policy. Never use a provisional
   table or write Notion as a native fallback.
 - Task IDs use the durable application namespace in `life_tasks.py`, UUIDv5
   over UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`, with
   byte-exact person IDs. Preserve retained occurrence mappings first. Keep
   birthday due dates as calendar labels; edit timestamps do not alter identity.
   Never rotate the namespace with credentials or overwrite existing tasks.
+  Retained targets always use adopted intent, even when equal to the generated
+  ID; missing adopted targets fail closed. Missing dates are skipped.
+  `created` confirms the atomic task/origin result; `existing` makes no creation
+  attribution. Errors stop requests and retain earlier validated receipts.
 - Consumer access uses dedicated Life Data credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
   Birthday-field read enrollment is configured. Create-only Tasks enrollment
