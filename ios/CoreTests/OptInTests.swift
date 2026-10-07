@@ -39,7 +39,7 @@ import XCTest
       XCTAssertEqual(body["table"] as? String, "people")
       XCTAssertEqual(body["id"] as? String, "p1")
       XCTAssertEqual(body["values"] as? [String: Int], ["notify_birthday": 1])
-      XCTAssertEqual(body["expected_revision"] as? [String: String], ["updated_at": self.revision.updatedAt, "hub_at": self.revision.hubAt])
+      XCTAssertEqual(body["expected_revision"] as? [String: String], ["updated_at": self.revision.updatedAt, "hub_at": self.revision.hubAt!])
       return (200, #"{"id":"p1","revision":{"updated_at":"2030-01-02T00:00:00.000Z","hub_at":"2030-01-02T00:00:01.000Z"}}"#)
     }
     let saved = try await client().setOptIn(person, enabled: true, source: PeopleSource(), contract: contract)
