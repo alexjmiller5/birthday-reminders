@@ -2,7 +2,14 @@ import SwiftUI
 
 @main
 struct BirthdaysApp: App {
-  @State private var model = BirthdayModel()
+  @State private var model: BirthdayModel
+  init() {
+    #if DEBUG
+    _model = State(initialValue: BirthdayUITestFixture.model() ?? BirthdayModel())
+    #else
+    _model = State(initialValue: BirthdayModel())
+    #endif
+  }
   @Environment(\.scenePhase) private var scenePhase
   var body: some Scene {
     WindowGroup {
