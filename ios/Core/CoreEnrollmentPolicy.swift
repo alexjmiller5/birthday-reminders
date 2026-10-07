@@ -13,7 +13,7 @@ import JavaScriptCore
     guard let url = Bundle.module.url(forResource: "life-enrollment", withExtension: "js"),
       let data = try? Data(contentsOf: url),
       SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined()
-        == "2ce7fb21f13d4bd46031039af6cfa0379ca60f2083dbb136174d7add54cfe8a3",
+        == "cd6a495dd3489a4161a7f7d3d8ce414cb77cc426636bac58181aace67cddcc2f",
       let source = String(data: data, encoding: .utf8), let context = JSContext()
     else { throw EnrollmentFailure("The approval policy could not be loaded.") }
     context.evaluateScript(source)

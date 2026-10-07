@@ -3,25 +3,29 @@
 The bundled `ios/Core/Resources/life-enrollment.js` is the minimal IIFE supplied
 by Life Core, with no local policy edits. It exports the public enrollment
 functions only. `CoreEnrollmentPolicy` loads it into JavaScriptCore and passes
-JSON across the realm boundary. Production uses the configured `birthdays-reader-v1` profile with
-exact read grants for People id/name/birthday/notify_birthday/deleted_at.
-Synthetic tests inject their own expected profile. Core confirmed deployment
-37540666572 and configured secret deployment
-`d773cac9-e3b9-48a6-8bfd-11876a298ce2`; the initial profile revision is
-`153e267c84de4290d64eb24f5056159d3166dd6e3de20a0dc2f66b29e310bb7e`.
+JSON across the realm boundary. New connections expect `birthdays-editor-v1`:
+People id/name/birthday/notify_birthday/deleted_at/updated_at/hub_at reads and
+only `tables:patch:people:notify_birthday`. Service deploy `37615482143` shipped
+main `7fea375f4ce482623fd13c4a4ef408115d5ea57b`. Configuration deployment
+`5a56ea49-84ea-4cc8-9e9d-c07d93cb3642` has profile revision
+`811fa070c5409e04f27f00b3d8a74b3778d4efd351cafb9dfdba8a20c6e7ede9`.
+Existing reader credentials remain read-only.
+Synthetic tests inject their own expected profile. The phone requires the
+conditional-patch capability and validates the live session before each edit.
 The canonical validator checks exact grants and a valid revision; accepted
 receipts retain the actual revision in device-only Keychain.
 
 Provenance:
 
-- Source: https://github.com/alexjmiller5/life-data/pull/19
-- Commit: `c5d8f9db9e8a10efed72e370ea7dba312ddbbf9d`
+- Source: https://github.com/alexjmiller5/life-data/pull/23
+- Commit: `88bbd6210782c1ccef15e0b7805225f0a6398398`
 - Public entry: `life-core/enrollment`, `core/src/enrollment.ts`
-- Contract: `b95ac80a2b30289866dea79a408135b6339c5975bd9a6bf13060ee9534bc9ecc`
-- IIFE SHA-256: `2ce7fb21f13d4bd46031039af6cfa0379ca60f2083dbb136174d7add54cfe8a3`
-- Size: 5574 bytes, including source/contract banner; no source map or host path.
+- Contract: `40ce1fb59bfe27a26bc878b193d694414c3b491fdc365cb421a96000b6b1c3a0`
+- IIFE SHA-256: `cd6a495dd3489a4161a7f7d3d8ce414cb77cc426636bac58181aace67cddcc2f`
+- Size: 5744 bytes, including source/contract banner; no source map or host path.
 
-Core built this with Bun browser target, IIFE format, minification, and this entry:
+Built from the reviewed Core source with Bun browser target, IIFE format,
+minification, and this entry (resolved to the pinned source):
 
 ```ts
 import {ENROLLMENT_POLICY,enrollmentApproval,validateDeviceSession,enrollmentPollResult,sessionRevocationResult} from 'life-core/enrollment';

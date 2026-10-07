@@ -3,12 +3,6 @@ import Foundation
 import Observation
 import UserNotifications
 
-struct UpcomingBirthday: Identifiable {
-  let person: BirthdayPerson
-  let date: Date
-  var id: String { person.id }
-}
-
 @MainActor @Observable
 final class BirthdayModel {
   private(set) var connection: Connection?
@@ -18,6 +12,16 @@ final class BirthdayModel {
   private(set) var scheduledCount = 0
   private(set) var renewBefore: Date?
   private(set) var busy = false
+  private(set) var savingPersonID: String?
+  private var pendingOptInIDs: Set<String>
+  var needsOptInRefresh: Bool { !pendingOptInIDs.isEmpty }
+  func isOptInPending(_ id: String) -> Bool { pendingOptInIDs.contains(id) }
+  private(set) var sortRules: [BirthdaySortRule]
+  var search = ""
+  var visibleBirthdays: [UpcomingBirthday] {
+    BirthdayListOrder.apply(upcoming, search: search, rules: sortRules)
+  }
+  var canEditOptIns: Bool { connection?.enrollmentProfile?.id == BirthdaysAccess.editorProfile }
   var error: String?
   var notice: String?
   var preferences: ReminderPreferences
@@ -27,6 +31,8 @@ final class BirthdayModel {
   private let session: URLSession
   private let authorize: () async throws -> Bool
   private let notifications = LocalNotifications()
+  private let notificationStore: any NotificationStore
+  private let authorizationStatus: () async -> UNAuthorizationStatus
 
   init(
     cache: BirthdayCache = BirthdayCache(
@@ -35,6 +41,10 @@ final class BirthdayModel {
       legacyURL: URL.applicationSupportDirectory.appendingPathComponent("BirthdayReminders/birthdays.json")),
     credentials: ConnectionStore = ConnectionStore(), defaults: UserDefaults = .standard,
     session: URLSession = .shared,
+    notificationStore: any NotificationStore = LocalNotifications(),
+    authorizationStatus: @escaping () async -> UNAuthorizationStatus = {
+      await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    },
     authorize: @escaping () async throws -> Bool = {
       try await UNUserNotificationCenter.current().requestAuthorization(options: [
         .alert, .sound, .badge,
@@ -46,6 +56,11 @@ final class BirthdayModel {
     self.defaults = defaults
     self.session = session
     self.authorize = authorize
+    self.notificationStore = notificationStore
+    self.authorizationStatus = authorizationStatus
+    sortRules = BirthdayListOrder.normalized(defaults.data(forKey: "birthday-sort-rules")
+      .flatMap { try? JSONDecoder().decode([BirthdaySortRule].self, from: $0) } ?? BirthdaySortRule.defaults)
+    pendingOptInIDs = Set(defaults.stringArray(forKey: "pending-opt-in-ids") ?? [])
     preferences =
       defaults.data(forKey: "reminder-preferences")
       .flatMap { try? JSONDecoder().decode(ReminderPreferences.self, from: $0) }
@@ -79,7 +94,8 @@ final class BirthdayModel {
       let endpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
       let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
       let client = try LifeDataClient(endpoint: endpoint, token: token, session: session)
-      let people = try await client.people(source: source)
+      let people = try await client.people(source: source,
+        includeRevisions: enrollmentProfile?.id == BirthdaysAccess.editorProfile)
       let value = BirthdaySnapshot(
         endpoint: endpoint, source: source, people: people, fetchedAt: Date())
       let newConnection = Connection(endpoint: endpoint, token: token, source: source,
@@ -99,6 +115,7 @@ final class BirthdayModel {
       }
       connection = newConnection
       snapshot = value
+      setNeedsOptInRefresh(false)
       accepted()
       error = nil
       rebuildUpcoming()
@@ -115,19 +132,67 @@ final class BirthdayModel {
     busy = true
     defer { busy = false }
     await updateAuthorization()
+    if needsOptInRefresh { await reschedule() }
     guard let connection else { return }
     do {
       let client = try LifeDataClient(
         endpoint: connection.endpoint, token: connection.token, session: session)
-      let people = try await client.people(source: connection.source)
+      let people = try await client.people(source: connection.source, includeRevisions: canEditOptIns)
       let value = BirthdaySnapshot(
         endpoint: connection.endpoint, source: connection.source, people: people, fetchedAt: Date())
       try cache.save(value)
       snapshot = value
+      setNeedsOptInRefresh(false)
       error = nil
     } catch { report(error) }
     rebuildUpcoming()
     await reschedule()
+  }
+
+  func saveSortRules(_ rules: [BirthdaySortRule]) {
+    sortRules = BirthdayListOrder.normalized(rules)
+    if let data = try? JSONEncoder().encode(sortRules) { defaults.set(data, forKey: "birthday-sort-rules") }
+  }
+
+  func setOptIn(_ person: BirthdayPerson, enabled: Bool) async {
+    guard !busy, !needsOptInRefresh, canEditOptIns, let connection,
+      let current = snapshot?.people.first(where: { $0.id == person.id }), current == person,
+      person.enabled != enabled else { return }
+    busy = true
+    savingPersonID = person.id
+    error = nil
+    // Persist before sending: termination or a lost acknowledgment must never
+    // turn an uncertain write into an automatic retry against a stale cache.
+    pendingOptInIDs.insert(person.id)
+    defaults.set(Array(pendingOptInIDs).sorted(), forKey: "pending-opt-in-ids")
+    // Suppress this person's cached reminders before sending. An offline restart
+    // cannot restore them while the retained cache is awaiting reconciliation.
+    await reschedule()
+    defer { busy = false; savingPersonID = nil }
+    do {
+      let contract = try BirthdaysAccess.editorContract()
+      let client = try LifeDataClient(endpoint: connection.endpoint, token: connection.token, session: session)
+      let saved = try await client.setOptIn(person, enabled: enabled, source: connection.source, contract: contract)
+      let value = BirthdaySnapshot(endpoint: connection.endpoint, source: connection.source,
+        people: (snapshot?.people ?? []).map { $0.id == saved.id ? saved : $0 },
+        fetchedAt: snapshot?.fetchedAt ?? Date())
+      // The service has confirmed the flag, so this phone must reconcile even
+      // if storage is temporarily full. Keep the refresh gate on cache failure.
+      snapshot = value
+      rebuildUpcoming()
+      try cache.save(value)
+      setNeedsOptInRefresh(false)
+    } catch BirthdayError.http(409) {
+      error = "This person changed in Life Data. Refresh to see the latest choice before trying again."
+    } catch {
+      self.error = "The notification choice could not be confirmed and saved. Refresh before trying again."
+    }
+    await reschedule()
+  }
+
+  private func setNeedsOptInRefresh(_ value: Bool) {
+    if !value { pendingOptInIDs = [] }
+    defaults.set(Array(pendingOptInIDs).sorted(), forKey: "pending-opt-in-ids")
   }
 
   func savePreferences(_ value: ReminderPreferences) async {
@@ -183,6 +248,7 @@ final class BirthdayModel {
       notifications.center.removeAllPendingNotificationRequests()
       notifications.center.removeAllDeliveredNotifications()
       connection = nil
+      setNeedsOptInRefresh(false)
       snapshot = nil
       upcoming = []
       scheduledCount = 0
@@ -195,7 +261,7 @@ final class BirthdayModel {
   }
 
   private func updateAuthorization() async {
-    authorization = await notifications.center.notificationSettings().authorizationStatus
+    authorization = await authorizationStatus()
   }
 
   private func reschedule() async {
@@ -204,10 +270,12 @@ final class BirthdayModel {
     renewBefore = nil
     guard authorization == .authorized || authorization == .provisional else { return }
     do {
+      var safePreferences = preferences
+      safePreferences.mutedIDs.formUnion(pendingOptInIDs)
       let plan = try ReminderPlan.make(
-        people: snapshot?.people ?? [], preferences: preferences, now: Date())
+        people: snapshot?.people ?? [], preferences: safePreferences, now: Date())
       scheduledCount = try await NotificationScheduler().apply(
-        plan, timeZoneID: preferences.timeZoneID, store: notifications)
+        plan, timeZoneID: preferences.timeZoneID, store: notificationStore)
       renewBefore = plan.renewBefore
     } catch { report(error) }
   }

@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, native-ios]
   pull_request:
-    paths: ['ios/**', 'Package.swift', '.github/workflows/*.yml', 'scripts/sign*', 'scripts/ios_workflow_test.py']
+    paths: ['ios/**', 'Package.swift', '.github/workflows/*.yml', 'scripts/sign*', 'scripts/ios_workflow_test.py', 'scripts/ios-mutation-test.py']
 
 permissions:
   contents: read
@@ -21,6 +21,8 @@ jobs:
           python3 scripts/ios_workflow_test.py
       - name: Test birthday core
         run: swift test --scratch-path "$RUNNER_TEMP/birthday-core"
+      - name: Verify core regression sensitivity
+        run: python3 scripts/ios-mutation-test.py "$RUNNER_TEMP/birthday-core"
       - name: Install project generator
         run: brew install xcodegen
       - name: Generate native project
@@ -42,3 +44,16 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/birthday-ios-tests" \
             CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES CODE_SIGNING_REQUIRED=YES \
             -resultBundlePath "$RUNNER_TEMP/birthday-tests.xcresult" test
+      - name: Export simulator screenshots
+        if: always()
+        run: |
+          if [ -d "$RUNNER_TEMP/birthday-tests.xcresult" ]; then
+            xcrun xcresulttool export attachments --path "$RUNNER_TEMP/birthday-tests.xcresult" --output-path "$RUNNER_TEMP/birthday-screenshots"
+          fi
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: simulator-screenshots
+          path: ${{ runner.temp }}/birthday-screenshots/**/*.png
+          if-no-files-found: ignore
+          retention-days: 1

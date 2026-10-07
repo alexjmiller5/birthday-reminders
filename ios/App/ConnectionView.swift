@@ -28,7 +28,7 @@ struct ConnectionView: View {
         } header: {
           Text("Connection")
         } footer: {
-          Text("This app requests birthday-only read access. Your opt-in choices stay in Life Data.")
+          Text("Birthdays reads names, birthdays and notification choices. It can change only the birthday notification opt-in in Life Data.")
         }
         Section {
           if waiting {
@@ -77,13 +77,10 @@ struct ConnectionView: View {
       .interactiveDismissDisabled(waiting || enrollment?.cleanupMessage != nil)
       .task {
         guard enrollment == nil else { return }
+        endpoint = model.connection?.endpoint ?? ""
         do {
           // Public service-owned profile, separate from the server Tasks writer.
-          let policy = try CoreEnrollmentPolicy(profileID: "birthdays-reader-v1", scopes: [
-            "tables:read:people:birthday", "tables:read:people:deleted_at", "tables:read:people:id",
-            "tables:read:people:name", "tables:read:people:notify_birthday",
-          ])
-          enrollment = EnrollmentSession(contract: policy.contract) { endpoint, token, receipt, current, accepted in
+          enrollment = EnrollmentSession(contract: try BirthdaysAccess.editorContract()) { endpoint, token, receipt, current, accepted in
             await model.installApprovedConnection(
               endpoint: endpoint, token: token, source: PeopleSource(), enrollmentProfile: receipt,
               isCurrent: current, accepted: accepted)
