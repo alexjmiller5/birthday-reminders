@@ -13,6 +13,7 @@ app = modal.App(APP_NAME)
 
 image = (
     modal.Image.debian_slim(python_version="3.13")
+    .apt_install("git")  # uv resolves the immutable Life Data library Git pin.
     .uv_sync(extra_options="--no-dev")  # reads pyproject.toml + uv.lock; skip dev group
     # add_local_dir, NOT add_local_python_source: the latter can't resolve
     # packages under src/ layout, and this also carries non-.py data files.
