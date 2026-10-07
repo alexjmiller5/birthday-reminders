@@ -13,7 +13,8 @@ final class BirthdayModel {
   private(set) var renewBefore: Date?
   private(set) var busy = false
   private(set) var savingPersonID: String?
-  private(set) var needsOptInRefresh = false
+  private var pendingOptInIDs: Set<String>
+  var needsOptInRefresh: Bool { !pendingOptInIDs.isEmpty }
   private(set) var sortRules: [BirthdaySortRule]
   var search = ""
   var visibleBirthdays: [UpcomingBirthday] {
@@ -29,6 +30,8 @@ final class BirthdayModel {
   private let session: URLSession
   private let authorize: () async throws -> Bool
   private let notifications = LocalNotifications()
+  private let notificationStore: any NotificationStore
+  private let authorizationStatus: () async -> UNAuthorizationStatus
 
   init(
     cache: BirthdayCache = BirthdayCache(
@@ -37,6 +40,10 @@ final class BirthdayModel {
       legacyURL: URL.applicationSupportDirectory.appendingPathComponent("BirthdayReminders/birthdays.json")),
     credentials: ConnectionStore = ConnectionStore(), defaults: UserDefaults = .standard,
     session: URLSession = .shared,
+    notificationStore: any NotificationStore = LocalNotifications(),
+    authorizationStatus: @escaping () async -> UNAuthorizationStatus = {
+      await UNUserNotificationCenter.current().notificationSettings().authorizationStatus
+    },
     authorize: @escaping () async throws -> Bool = {
       try await UNUserNotificationCenter.current().requestAuthorization(options: [
         .alert, .sound, .badge,
@@ -48,9 +55,11 @@ final class BirthdayModel {
     self.defaults = defaults
     self.session = session
     self.authorize = authorize
+    self.notificationStore = notificationStore
+    self.authorizationStatus = authorizationStatus
     sortRules = BirthdayListOrder.normalized(defaults.data(forKey: "birthday-sort-rules")
       .flatMap { try? JSONDecoder().decode([BirthdaySortRule].self, from: $0) } ?? BirthdaySortRule.defaults)
-    needsOptInRefresh = defaults.bool(forKey: "opt-in-refresh-required")
+    pendingOptInIDs = Set(defaults.stringArray(forKey: "pending-opt-in-ids") ?? [])
     preferences =
       defaults.data(forKey: "reminder-preferences")
       .flatMap { try? JSONDecoder().decode(ReminderPreferences.self, from: $0) }
@@ -122,6 +131,7 @@ final class BirthdayModel {
     busy = true
     defer { busy = false }
     await updateAuthorization()
+    if needsOptInRefresh { await reschedule() }
     guard let connection else { return }
     do {
       let client = try LifeDataClient(
@@ -152,7 +162,11 @@ final class BirthdayModel {
     error = nil
     // Persist before sending: termination or a lost acknowledgment must never
     // turn an uncertain write into an automatic retry against a stale cache.
-    setNeedsOptInRefresh(true)
+    pendingOptInIDs.insert(person.id)
+    defaults.set(Array(pendingOptInIDs).sorted(), forKey: "pending-opt-in-ids")
+    // Suppress this person's cached reminders before sending. An offline restart
+    // cannot restore them while the retained cache is awaiting reconciliation.
+    await reschedule()
     defer { busy = false; savingPersonID = nil }
     do {
       let contract = try BirthdaysAccess.editorContract()
@@ -165,7 +179,6 @@ final class BirthdayModel {
       // if storage is temporarily full. Keep the refresh gate on cache failure.
       snapshot = value
       rebuildUpcoming()
-      await reschedule()
       try cache.save(value)
       setNeedsOptInRefresh(false)
     } catch BirthdayError.http(409) {
@@ -173,11 +186,12 @@ final class BirthdayModel {
     } catch {
       self.error = "The notification choice could not be confirmed and saved. Refresh before trying again."
     }
+    await reschedule()
   }
 
   private func setNeedsOptInRefresh(_ value: Bool) {
-    needsOptInRefresh = value
-    defaults.set(value, forKey: "opt-in-refresh-required")
+    if !value { pendingOptInIDs = [] }
+    defaults.set(Array(pendingOptInIDs).sorted(), forKey: "pending-opt-in-ids")
   }
 
   func savePreferences(_ value: ReminderPreferences) async {
@@ -246,7 +260,7 @@ final class BirthdayModel {
   }
 
   private func updateAuthorization() async {
-    authorization = await notifications.center.notificationSettings().authorizationStatus
+    authorization = await authorizationStatus()
   }
 
   private func reschedule() async {
@@ -255,10 +269,12 @@ final class BirthdayModel {
     renewBefore = nil
     guard authorization == .authorized || authorization == .provisional else { return }
     do {
+      var safePreferences = preferences
+      safePreferences.mutedIDs.formUnion(pendingOptInIDs)
       let plan = try ReminderPlan.make(
-        people: snapshot?.people ?? [], preferences: preferences, now: Date())
+        people: snapshot?.people ?? [], preferences: safePreferences, now: Date())
       scheduledCount = try await NotificationScheduler().apply(
-        plan, timeZoneID: preferences.timeZoneID, store: notifications)
+        plan, timeZoneID: preferences.timeZoneID, store: notificationStore)
       renewBefore = plan.renewBefore
     } catch { report(error) }
   }

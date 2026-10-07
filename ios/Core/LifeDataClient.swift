@@ -67,18 +67,21 @@ public final class LifeDataClient: @unchecked Sendable {
     guard let revision = person.revision else { throw BirthdayError.invalidResponse }
     // A cached profile receipt is not current authorization. Validate the exact
     // live session through the canonical policy before submitting an edit.
-    _ = try await contract.validate(request(path: "v1/session"))
+    _ = try await contract.validate(request(path: "v1/session", maximumBytes: 65_536))
     let receipt = try await request(path: "v1/rows/patch", body: [
       "table": source.table, "id": person.id, "values": [source.enabledColumn: enabled ? 1 : 0],
       "expected_revision": ["updated_at": revision.updatedAt, "hub_at": revision.hubAt as Any? ?? NSNull()],
-    ])
+    ], expectedStatus: 200, maximumBytes: 65_536)
     guard receipt["id"] as? String == person.id, let next = receipt["revision"] as? [String: Any]
     else { throw BirthdayError.invalidResponse }
+    let committed = try RowRevision.parse(next)
+    guard committed.updatedAt > revision.updatedAt else { throw BirthdayError.invalidResponse }
     return BirthdayPerson(id: person.id, name: person.name, birthday: person.birthday,
-                          enabled: enabled, revision: try RowRevision.parse(next))
+                          enabled: enabled, revision: committed)
   }
 
-  private func request(path: String, body: [String: Any]? = nil) async throws -> [String: Any] {
+  private func request(path: String, body: [String: Any]? = nil,
+                       expectedStatus: Int? = nil, maximumBytes: Int = 5_000_000) async throws -> [String: Any] {
     var request = URLRequest(url: endpoint.appendingPathComponent(path))
     request.timeoutInterval = 30
     request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -91,10 +94,10 @@ public final class LifeDataClient: @unchecked Sendable {
     let (data, response) = try await session.data(for: request, delegate: NoRedirect())
     guard let response = response as? HTTPURLResponse else { throw BirthdayError.invalidResponse }
     if response.statusCode == 401 || response.statusCode == 403 { throw BirthdayError.unauthorized }
-    guard (200...299).contains(response.statusCode) else {
+    guard (200...299).contains(response.statusCode), expectedStatus == nil || response.statusCode == expectedStatus else {
       throw BirthdayError.http(response.statusCode)
     }
-    guard data.count <= 5_000_000,
+    guard data.count <= maximumBytes,
       let reply = try JSONSerialization.jsonObject(with: data) as? [String: Any]
     else { throw BirthdayError.invalidResponse }
     return reply

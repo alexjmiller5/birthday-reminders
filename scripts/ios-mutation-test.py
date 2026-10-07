@@ -10,7 +10,7 @@ cases = [
      "[], locale: locale)", "BirthdayListTests", "case/accent search"),
     ("ios/Core/BirthdayListOrder.swift", "rule.reversed ? .orderedDescending : .orderedAscending",
      "rule.reversed ? .orderedAscending : .orderedDescending", "BirthdayListTests", "sort direction"),
-    ("ios/Core/LifeDataClient.swift", "_ = try await contract.validate(request(path: \"v1/session\"))",
+    ("ios/Core/LifeDataClient.swift", "_ = try await contract.validate(request(path: \"v1/session\", maximumBytes: 65_536))",
      "// Deliberately removed for mutation verification.", "OptInTests", "live session authorization"),
 ]
 

@@ -26,7 +26,7 @@ private final class BirthdayFixtureProtocol: URLProtocol {
   override class func canInit(with request: URLRequest) -> Bool { true }
   override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
   override func startLoading() {
-    let revision = ["updated_at": "2030-01-01T00:00:00.000Z", "hub_at": "2030-01-01T00:00:00.000Z"]
+    let revision = ["updated_at": Self.enabled ? "2030-01-02T00:00:00.000Z" : "2030-01-01T00:00:00.000Z", "hub_at": "2030-01-01T00:00:00.000Z"]
     let body: [String: Any]
     switch request.url!.path {
     case "/v1/session":
@@ -35,7 +35,7 @@ private final class BirthdayFixtureProtocol: URLProtocol {
         "capabilities": ["row_api": "v1", "schema": "none", "replica_sync": false, "conditional_patch": "revision-v1"]]
     case "/v1/rows/patch":
       Self.enabled.toggle()
-      body = ["id": "fixture-a", "revision": revision]
+      body = ["id": "fixture-a", "revision": ["updated_at": "2030-01-02T00:00:00.000Z", "hub_at": "2030-01-02T00:00:00.000Z"]]
     default:
       body = ["rows": [("fixture-a", "<pérson-a>", "--01-01", Self.enabled), ("fixture-b", "<person-b>", "--02-01", true)].map { id, name, birthday, enabled -> [String: Any] in
         ["id": id, "name": name, "birthday": birthday, "notify_birthday": enabled ? 1 : 0,
