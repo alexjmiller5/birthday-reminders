@@ -21,6 +21,8 @@ jobs:
           python3 scripts/ios_workflow_test.py
       - name: Test birthday core
         run: swift test --scratch-path "$RUNNER_TEMP/birthday-core"
+      - name: Verify core regression sensitivity
+        run: python3 scripts/ios-mutation-test.py "$RUNNER_TEMP/birthday-core"
       - name: Install project generator
         run: brew install xcodegen
       - name: Generate native project

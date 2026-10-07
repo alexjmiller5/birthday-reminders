@@ -6,15 +6,17 @@ Notion/ntfy deployment and is not used by the native app.
 
 ## Native app
 
-The iOS 17+ app shows upcoming birthdays, honors source opt-ins, supports
-per-phone mutes, and lets you choose a reminder time and timezone. It stores
+The iOS 17+ app searches names without case or accent differences and sorts by
+name, next birthday, or shared notification opt-in. The Sort sheet combines,
+reorders and reverses rules; upcoming first is the default. Sort choices persist
+on this phone. You can also choose a reminder time and timezone. It stores
 its connection in Keychain and a complete birthday snapshot in Application
 Support. Failed syncs retain the previous snapshot.
 
 Connect with your **Life Data URL**, then choose **Continue in browser** and
-open the approval link. Review the birthday-only read grants and approve in
+open the approval link. Review the birthday read and notification opt-in edit grants and approve in
 your browser; return to the app while it finishes connecting. No token copying
-is required. The app uses the service-owned `birthdays-reader-v1`
+is required. The app uses the service-owned `birthdays-editor-v1`
 profile and rejects broader grants. An unsupported hub cannot fall back to
 full-access enrollment.
 
@@ -27,9 +29,16 @@ The service owns the exact scope and approval receipt. Phone access is limited
 to birthday fields; the Tasks writer has a separate identity. Requested columns
 alone do not restrict a whole-table grant.
 
-Birthdays may be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. Edit people
-and opt-ins in Life Data; local mute controls affect this phone only. The native
-app sends no record writes, has no analytics, and never receives provider/admin
+Birthdays may be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. The list's
+**Birthday notifications** toggle updates only `notify_birthday` in Life Data.
+It shows the confirmed choice after saving, then reschedules this phone.
+Concurrent edits and uncertain saves require a refresh before another attempt;
+they are never automatically retried. Existing read-only connections keep
+working: choose **Enable opt-in editing** for browser approval with a new
+device credential. Canceling or failing approval preserves the old connection.
+Names and birthday dates remain editable through Life Data. Existing per-phone
+mutes remain effective and show an explicit **Enable on this phone** action.
+The native app has no analytics and never receives provider/admin
 credentials. A replacement phone enrolls independently. Disconnect clears this
 phone's saved connection, cache and notifications. Revocation stops a credential
 at the service; forgetting local data alone does not prove revocation.

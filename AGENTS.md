@@ -26,8 +26,10 @@ application namespace are stable across display-name changes.
   `EnrollmentSession` hosts random candidate generation, fingerprint-only links,
   bounded polling and generation/deadline fencing. `CoreEnrollmentPolicy` runs
   the pinned canonical policy resource; provenance is in `docs/enrollment-policy.md`.
-  Production uses configured profile `birthdays-reader-v1` with exactly
-  the five People read-column grants declared in `ConnectionView`. Never substitute Life UI's full-replica `/login` contract.
+  New connections use profile `birthdays-editor-v1` and exact scopes declared
+  in `BirthdaysAccess`: seven People read columns and patch-only notify_birthday.
+  Existing reader connections retain five-column reads until explicit browser
+  reenrollment. Never substitute Life UI's full-replica `/login` contract.
 - Credentials belong in this app's device-only Keychain, never the bundle,
   defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
   phone People read and Tasks writer use separate identities. Candidate cleanup
@@ -35,7 +37,11 @@ application namespace are stable across display-name changes.
 - An approved installer must check its enrollment attempt before committing.
   Save the cache before replacing Keychain; failed/canceled enrollment preserves
   the previously accepted connection. Notification testing needs no enrollment.
-- Source opt-ins come from Life Data. Mutes are per-phone preferences.
+- Source opt-ins come from Life Data. Toggle writes use its conditional patch
+  with cached updated_at/hub_at revisions and canonical live session validation.
+  Confirmed saves reconcile notifications; uncertain/conflicting writes persist
+  a refresh gate across restarts. No automatic write retries. Mutes remain
+  per-phone preferences. Search is transient; ordered reversible sorts persist.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
