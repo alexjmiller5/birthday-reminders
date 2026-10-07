@@ -13,9 +13,5 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v7
-      # Canonical JS policy conformance only; never part of the Modal runtime.
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: 1.4.2
       - run: uv run --locked ruff check .
       - run: uv run --locked pytest -q

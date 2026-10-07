@@ -5,6 +5,7 @@ description = "Opt-in birthday reminders sourced from the Notion People DB with 
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28",
+    "life-data",
     "pydantic>=2.10",
     "pydantic-settings>=2.7",
     "structlog>=25.1",
@@ -25,3 +26,6 @@ testpaths = ["tests"]
 [tool.ruff]
 src = ["src", "tests"]
 line-length = 100
+
+[tool.uv.sources]
+life-data = { git = "https://github.com/alexjmiller5/life-data.git", rev = "5f23a6efa39c5f010c688a5f6b9f0359b2547c23" }

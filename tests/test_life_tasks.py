@@ -2,8 +2,6 @@
 
 import datetime as dt
 import json
-import subprocess
-from pathlib import Path
 
 import httpx
 import pytest
@@ -18,33 +16,6 @@ POLICY = {
 }
 SCOPES = [f"rows:create:{POLICY['id']}:{POLICY['revision']}"]
 TARGET = "ce64b9e7f42f5f529f299a908c0d3935"
-
-
-class CanonicalPolicy:
-    """Test host only. Production will use Core's separately pinned Python boundary."""
-
-    def call(self, name, *args):
-        script = (
-            'import * as policy from "./tests/fixtures/life-creation.js";'
-            "const args = JSON.parse(await Bun.stdin.text());"
-            f"console.log(JSON.stringify(policy.{name}(...args)));"
-        )
-        result = subprocess.run(
-            ["bun", "-e", script],
-            input=json.dumps(args),
-            capture_output=True,
-            text=True,
-            check=True,
-            cwd=Path(__file__).resolve().parents[1],
-            timeout=10,
-        )
-        return json.loads(result.stdout)
-
-    def validate_session(self, reply, policy, scopes):
-        return self.call("validateCreationSession", reply, policy, scopes)
-
-    def validate_receipt(self, request, reply):
-        return self.call("validateCreationReceipt", request, reply)
 
 
 def person(**changes):
@@ -101,7 +72,6 @@ def run(server, plans=None, **changes):
             plan() if plans is None else plans,
             policy=POLICY,
             scopes=SCOPES,
-            validator=CanonicalPolicy(),
             **changes,
         )
 
@@ -356,9 +326,7 @@ def test_empty_duplicate_and_insecure_requests_fail_before_network():
         base_url="http://hub.example", transport=httpx.MockTransport(server)
     ) as client:
         with pytest.raises(ValueError, match="HTTPS"):
-            tasks.create_tasks(
-                client, plan(), policy=POLICY, scopes=SCOPES, validator=CanonicalPolicy()
-            )
+            tasks.create_tasks(client, plan(), policy=POLICY, scopes=SCOPES)
 
 
 @pytest.mark.parametrize("changes", [{"notify_birthday": "false"}, {"id": ""}, {"name": ""}])
@@ -405,3 +373,29 @@ def test_failed_session_preflight_never_sends_a_create_or_follows_redirect(statu
     with pytest.raises(tasks.CreationInterrupted):
         run(server)
     assert calls == ["https://hub.example/v1/session"]
+
+
+def test_actual_python_validator_accepts_tuple_scope_input():
+    from types import SimpleNamespace
+
+    from life_data.creation import validate_creation_receipt, validate_creation_session
+
+    validator = SimpleNamespace(
+        validate_session=validate_creation_session, validate_receipt=validate_creation_receipt
+    )
+    calls = []
+
+    def server(request):
+        calls.append(request.url.path)
+        if request.method == "GET":
+            return httpx.Response(200, json=session())
+        return httpx.Response(200, json=created(json.loads(request.content)))
+
+    with httpx.Client(
+        base_url="https://hub.example", transport=httpx.MockTransport(server)
+    ) as client:
+        result = tasks.create_tasks(
+            client, plan(), policy=POLICY, scopes=tuple(SCOPES), validator=validator
+        )
+    assert calls == ["/v1/session", "/v1/rows/create"]
+    assert result["created"][0]["id"] == TARGET

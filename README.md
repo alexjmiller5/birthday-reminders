@@ -71,10 +71,10 @@ cause. The adapter stops and never retries automatically. A caller may replay
 identical intent after a lost acknowledgement; an `existing` receipt establishes
 presence only and never claims that this caller created the row.
 
-The host must supply Life Core's canonical validator through the injected
-boundary; no handwritten fallback exists. The [policy test provenance](docs/creation-policy.md)
-describes the test-only JS bundle. Production awaits Core's pure-Python boundary
-and separately verified configured policy and credential receipts.
+The adapter defaults to Life Core's pinned canonical Python validator through
+an injectable boundary; no handwritten fallback exists. The
+[policy provenance](docs/creation-policy.md) records the exact library pin.
+Activation awaits separately verified configured policy and credential receipts.
 
 Before connecting the daily cron, establish narrow caller enrollment, complete
 People reads, historical dedupe coverage, the service's lineage contract, and

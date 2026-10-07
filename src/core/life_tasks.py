@@ -14,6 +14,7 @@ from typing import Protocol
 from uuid import UUID, uuid5
 
 import httpx
+from life_data.creation import validate_creation_receipt, validate_creation_session
 
 # Durable application identity, shared by all installations. Never rotate this
 # with credentials or derive it from a device, title, endpoint or project ID.
@@ -149,9 +150,16 @@ def plan_tasks(
 class CreationValidator(Protocol):
     """Host binding to Life Core's canonical pure checks, not a second validator."""
 
-    def validate_session(self, reply: dict, policy: dict, scopes: Sequence[str]) -> bool: ...
+    def validate_session(self, reply: dict, policy: dict, scopes: list[str]) -> bool: ...
 
     def validate_receipt(self, request: dict, reply: dict) -> dict | None: ...
+
+
+class CoreCreationValidator:
+    """Bind the pinned library's pure functions without duplicating its policy."""
+
+    validate_session = staticmethod(validate_creation_session)
+    validate_receipt = staticmethod(validate_creation_receipt)
 
 
 class CreationInterrupted(RuntimeError):
@@ -168,12 +176,12 @@ def create_tasks(
     *,
     policy: dict,
     scopes: Sequence[str],
-    validator: CreationValidator,
+    validator: CreationValidator = CoreCreationValidator(),
 ) -> dict:
     """Create one task plus origin per request under the exact advertised grant.
 
     The host supplies a pinned canonical validator and a dedicated credential.
-    There is deliberately no default validator or configured live writer. Errors
+    The default binding uses Life Core; there is no configured live writer. Errors
     stop this batch, preserve prior receipts and never trigger a fallback/retry.
     A caller may retry identical intent; existing settles presence only, without
     attributing creation. Adopted missing is an error, never a generated insert.
@@ -193,7 +201,7 @@ def create_tasks(
         response = client.get("/v1/session", follow_redirects=False, timeout=30)
         response.raise_for_status()
         if not validator.validate_session(
-            {"status": response.status_code, "data": response.json()}, policy, scopes
+            {"status": response.status_code, "data": response.json()}, policy, list(scopes)
         ):
             raise ValueError("Unsupported Life Data creation session")
         for intent in intents:

@@ -40,9 +40,9 @@ application namespace are stable across display-name changes.
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
 - `src/core/life_tasks.py` plans Tasks rows against the published catalog and
-  calls `/v1/rows/create` with an injected canonical Life Core validator.
-  It is not connected to the cron. Live activation requires the pinned Python
-  validator, exact configured policy/credential receipt, complete People reads,
+  calls `/v1/rows/create` with the pinned canonical Life Core Python validator.
+  It is not connected to the cron. Live activation requires the exact configured
+  policy/credential receipt, complete People reads,
   reviewed historical occurrence mappings and explicit creation policy. Never use a provisional
   table or write Notion as a native fallback.
 - Task IDs use the durable application namespace in `life_tasks.py`, UUIDv5
