@@ -1,11 +1,11 @@
 [project]
 name = "birthdays"
 version = "0.1.0"
-description = "Life Data birthday task planning and atomic creation adapter"
+description = "Soma birthday task planning and atomic creation adapter"
 requires-python = ">=3.13"
 dependencies = [
     "httpx>=0.28",
-    "life-data",
+    "soma",
 ]
 
 [dependency-groups]
@@ -24,4 +24,4 @@ src = ["src", "tests"]
 line-length = 100
 
 [tool.uv.sources]
-life-data = { git = "https://github.com/alexjmiller5/life-data.git", rev = "5f23a6efa39c5f010c688a5f6b9f0359b2547c23" }
+soma = { git = "https://github.com/alexjmiller5/soma.git", rev = "1950bdb22ad8965bcee776ef4051f1665b590aeb" }

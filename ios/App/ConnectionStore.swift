@@ -15,7 +15,7 @@ struct ConnectionStore {
   private var query: [String: Any] {
     [
       kSecClass as String: kSecClassGenericPassword,
-      kSecAttrService as String: service, kSecAttrAccount as String: "life-data",
+      kSecAttrService as String: service, kSecAttrAccount as String: "life-data",  // stored key of existing installs
     ]
   }
   func load() throws -> Connection? {

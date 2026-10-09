@@ -1,14 +1,14 @@
 # Task creation policy boundary
 
 The Python planner emits one source/occurrence/target intent per opted-in birthday.
-The adapter uses the canonical Life Core Python validator for session capability
+The adapter uses the canonical Soma Core Python validator for session capability
 and each receipt. The functions remain injectable for host conformance tests.
 There is no duplicate validator, JavaScript engine, installed CLI or native auth
 requirement in the task writer.
 
-`pyproject.toml` and `uv.lock` pin the public `life-data` library to commit
+`pyproject.toml` and `uv.lock` pin the public `soma` library to commit
 `5f23a6efa39c5f010c688a5f6b9f0359b2547c23`. Its standard-library-only
-`life_data.creation.validate_creation_session` and
+`soma.creation.validate_creation_session` and
 `validate_creation_receipt` functions match contract
 `40ce1fb59bfe27a26bc878b193d694414c3b491fdc365cb421a96000b6b1c3a0`.
 Core independently verifies cross-language parity and actual Worker receipts.

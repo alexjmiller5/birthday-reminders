@@ -6,7 +6,7 @@ import json
 import httpx
 import pytest
 
-from core import life_tasks as tasks
+from core import soma_tasks as tasks
 
 DAY = dt.date(2030, 2, 28)
 STAMP = dt.datetime(2030, 2, 28, 14, tzinfo=dt.UTC)
@@ -378,7 +378,7 @@ def test_failed_session_preflight_never_sends_a_create_or_follows_redirect(statu
 def test_actual_python_validator_accepts_tuple_scope_input():
     from types import SimpleNamespace
 
-    from life_data.creation import validate_creation_receipt, validate_creation_session
+    from soma.creation import validate_creation_receipt, validate_creation_session
 
     validator = SimpleNamespace(
         validate_session=validate_creation_session, validate_receipt=validate_creation_receipt

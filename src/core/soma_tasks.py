@@ -1,4 +1,4 @@
-"""Life Data birthday task planning and atomic-origin creation transport.
+"""Soma birthday task planning and atomic-origin creation transport.
 
 Not connected to the cron. Enrollment, complete People reads, migration dedupe
 coverage and creation policy must be established before enabling a live caller.
@@ -14,7 +14,7 @@ from typing import Protocol
 from uuid import UUID, uuid5
 
 import httpx
-from life_data.creation import validate_creation_receipt, validate_creation_session
+from soma.creation import validate_creation_receipt, validate_creation_session
 
 # Durable application identity, shared by all installations. Never rotate this
 # with credentials or derive it from a device, title, endpoint or project ID.
@@ -148,7 +148,7 @@ def plan_tasks(
 
 
 class CreationValidator(Protocol):
-    """Host binding to Life Core's canonical pure checks, not a second validator."""
+    """Host binding to Soma Core's canonical pure checks, not a second validator."""
 
     def validate_session(self, reply: dict, policy: dict, scopes: list[str]) -> bool: ...
 
@@ -166,7 +166,7 @@ class CreationInterrupted(RuntimeError):
     """Indeterminate/error outcome with validated receipts from earlier requests."""
 
     def __init__(self, receipt: dict):
-        super().__init__("Life Data creation interrupted; inspect receipts before retrying")
+        super().__init__("Soma creation interrupted; inspect receipts before retrying")
         self.receipt = receipt
 
 
@@ -181,13 +181,13 @@ def create_tasks(
     """Create one task plus origin per request under the exact advertised grant.
 
     The host supplies a pinned canonical validator and a dedicated credential.
-    The default binding uses Life Core; there is no configured live writer. Errors
+    The default binding uses Soma Core; there is no configured live writer. Errors
     stop this batch, preserve prior receipts and never trigger a fallback/retry.
     A caller may retry identical intent; existing settles presence only, without
     attributing creation. Adopted missing is an error, never a generated insert.
     """
     if client.base_url.scheme != "https":
-        raise ValueError("Life Data requires an HTTPS endpoint")
+        raise ValueError("Soma requires an HTTPS endpoint")
     try:
         ids = [intent["target"]["id"] for intent in intents]
     except (KeyError, TypeError):
@@ -203,7 +203,7 @@ def create_tasks(
         if not validator.validate_session(
             {"status": response.status_code, "data": response.json()}, policy, list(scopes)
         ):
-            raise ValueError("Unsupported Life Data creation session")
+            raise ValueError("Unsupported Soma creation session")
         for intent in intents:
             request = {**intent, "policy": dict(policy)}
             response = client.post(
@@ -214,7 +214,7 @@ def create_tasks(
                 request, {"status": response.status_code, "data": response.json()}
             )
             if receipt is None:
-                raise ValueError("Invalid Life Data creation receipt")
+                raise ValueError("Invalid Soma creation receipt")
             result[receipt["kind"]].append(receipt)
     except (httpx.HTTPError, ValueError) as error:
         raise CreationInterrupted(result) from error

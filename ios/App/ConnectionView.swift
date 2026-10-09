@@ -18,17 +18,17 @@ struct ConnectionView: View {
       Form {
         Section {
           Text("Connect your birthdays").font(.title2.bold())
-          Text("Enter your Life Data address, then approve Birthdays in your browser. This phone keeps its connection securely in Keychain.")
+          Text("Enter your Soma address, then approve Birthdays in your browser. This phone keeps its connection securely in Keychain.")
             .foregroundStyle(.secondary)
         }
         Section {
-          TextField("Life Data URL", text: $endpoint).keyboardType(.URL)
+          TextField("Soma URL", text: $endpoint).keyboardType(.URL)
             .textInputAutocapitalization(.never).autocorrectionDisabled()
             .disabled(waiting)
         } header: {
           Text("Connection")
         } footer: {
-          Text("Birthdays reads names, birthdays and notification choices. It can change only the birthday notification opt-in in Life Data.")
+          Text("Birthdays reads names, birthdays and notification choices. It can change only the birthday notification opt-in in Soma.")
         }
         Section {
           if waiting {
@@ -57,7 +57,7 @@ struct ConnectionView: View {
           if let error = model.error { Text(error).foregroundStyle(.red) }
         }
       }
-      .navigationTitle("Life Data")
+      .navigationTitle("Soma")
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
           Button("Done") {

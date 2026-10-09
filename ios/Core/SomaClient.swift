@@ -8,7 +8,7 @@ public struct PeopleSource: Codable, Equatable, Sendable {
   public init() {}
 }
 
-public final class LifeDataClient: @unchecked Sendable {
+public final class SomaClient: @unchecked Sendable {
   private let endpoint: URL
   private let token: String
   private let session: URLSession

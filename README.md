@@ -1,8 +1,8 @@
 # Birthdays
 
-Native iPhone birthday reminders backed by Life Data, with notifications
+Native iPhone birthday reminders backed by Soma, with notifications
 scheduled on the phone. There is no active server-side birthday job. The Python
-Life Data Tasks adapter is tested but not connected to a scheduler.
+Soma Tasks adapter is tested but not connected to a scheduler.
 
 ## Native app
 
@@ -13,7 +13,7 @@ on this phone. You can also choose a reminder time and timezone. It stores
 its connection in Keychain and a complete birthday snapshot in Application
 Support. Failed syncs retain the previous snapshot.
 
-Connect with your **Life Data URL**, then choose **Continue in browser** and
+Connect with your **Soma URL**, then choose **Continue in browser** and
 open the approval link. Review the birthday read and notification opt-in edit grants and approve in
 your browser; return to the app while it finishes connecting. No token copying
 is required. The app uses the service-owned `birthdays-editor-v1`
@@ -30,7 +30,7 @@ to birthday fields; the Tasks writer has a separate identity. Requested columns
 alone do not restrict a whole-table grant.
 
 Birthdays may be `YYYY-MM-DD` or `--MM-DD` when the year is unknown. The list's
-**Birthday notifications** toggle updates only `notify_birthday` in Life Data.
+**Birthday notifications** toggle updates only `notify_birthday` in Soma.
 It shows the confirmed choice after saving, then reschedules this phone.
 Concurrent edits and uncertain saves require a refresh before another attempt;
 they are never automatically retried. Pending changes temporarily suppress
@@ -38,14 +38,14 @@ that person's reminders, including after an offline restart, until refreshed.
 Existing read-only connections keep
 working: choose **Enable opt-in editing** for browser approval with a new
 device credential. Canceling or failing approval preserves the old connection.
-Names and birthday dates remain editable through Life Data. Existing per-phone
+Names and birthday dates remain editable through Soma. Existing per-phone
 mutes remain effective and show an explicit **Enable on this phone** action.
 The native app has no analytics and never receives provider/admin
 credentials. A replacement phone enrolls independently. Disconnect clears this
 phone's saved connection, cache and notifications. Revocation stops a credential
 at the service; forgetting local data alone does not prove revocation.
 
-Allow notifications when asked. **No Life Data sign-in is needed to test
+Allow notifications when asked. **No Soma sign-in is needed to test
 notifications.** Settings includes **Send test notification**:
 leave the app or lock the phone and wait 10 seconds. If permission was denied,
 use **Open notification settings**. Focus modes and notification summaries
@@ -59,8 +59,8 @@ when to reopen it to renew coverage; it syncs and reschedules on foreground.
 Already scheduled notifications work offline with the app closed. Source
 changes take effect after a successful sync, not instantly in the background.
 
-**Life Data Tasks has a published schema; daily task creation is not active.**
-The tested adapter in `src/core/life_tasks.py` plans opted-in birthday tasks and
+**Soma Tasks has a published schema; daily task creation is not active.**
+The tested adapter in `src/core/soma_tasks.py` plans opted-in birthday tasks and
 uses the policy-bound `/v1/rows/create` route for an atomic task and origin.
 Existing, completed, canceled
 and tombstoned rows are preserved by that service contract. Retries reuse the
@@ -82,7 +82,7 @@ cause. The adapter stops and never retries automatically. A caller may replay
 identical intent after a lost acknowledgement; an `existing` receipt establishes
 presence only and never claims that this caller created the row.
 
-The adapter defaults to Life Core's pinned canonical Python validator through
+The adapter defaults to Soma Core's pinned canonical Python validator through
 an injectable boundary; no handwritten fallback exists. The
 [policy provenance](docs/creation-policy.md) records the exact library pin.
 Activation requires separately verified configured policy and credential receipts;
@@ -97,7 +97,7 @@ execution is not responsible for the daily writer.
 
 ## Development and installation
 
-Requires Xcode and XcodeGen. The bundled [Life Core enrollment policy](docs/enrollment-policy.md)
+Requires Xcode and XcodeGen. The bundled [Soma Core enrollment policy](docs/enrollment-policy.md)
 runs in the system JavaScriptCore framework; no replica runtime is included.
 
 ```sh
@@ -148,7 +148,7 @@ license included in `ios/App/Tabler-LICENSE.txt`.
 
 ## Python Tasks adapter
 
-`src/core/life_tasks.py` contains the dormant task planner and creation adapter.
+`src/core/soma_tasks.py` contains the dormant task planner and creation adapter.
 `just test` and `just check` run pytest and ruff. There is no server entrypoint,
 cron, automatic deployment workflow or notification service in this repository.
 Task-writer activation requires the readiness checks described above and a new,
@@ -161,4 +161,4 @@ The native app uses browser enrollment and its own Keychain credential.
 The manual iOS signing workflow declares its own project-owned signing inputs;
 bootstrap uses those workflow references when configuring CI. Future server
 configuration belongs in the project's ENV item and must use its independently
-revocable, narrowly scoped Life Data writer credential.
+revocable, narrowly scoped Soma writer credential.

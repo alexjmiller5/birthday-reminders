@@ -2,7 +2,7 @@ import CryptoKit
 import Foundation
 import JavaScriptCore
 
-/// Runs the reviewed Life Core enrollment policy without its replica runtime.
+/// Runs the reviewed Soma Core enrollment policy without its replica runtime.
 /// Profile selection is supplied by the service contract, never user token entry.
 @MainActor public final class CoreEnrollmentPolicy {
   private let context: JSContext
@@ -10,7 +10,7 @@ import JavaScriptCore
   private let profile: [String: Any]
 
   public init(profileID: String, scopes: [String]) throws {
-    guard let url = Bundle.module.url(forResource: "life-enrollment", withExtension: "js"),
+    guard let url = Bundle.module.url(forResource: "soma-enrollment", withExtension: "js"),
       let data = try? Data(contentsOf: url),
       SHA256.hash(data: data).map({ String(format: "%02x", $0) }).joined()
         == "cd6a495dd3489a4161a7f7d3d8ce414cb77cc426636bac58181aace67cddcc2f",
@@ -70,6 +70,6 @@ import JavaScriptCore
   }
 
   private func invalidResponse() -> EnrollmentFailure {
-    EnrollmentFailure("Life Data did not approve birthday-only access for this device.")
+    EnrollmentFailure("Soma did not approve birthday-only access for this device.")
   }
 }

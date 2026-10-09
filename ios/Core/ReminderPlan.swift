@@ -70,14 +70,14 @@ public enum BirthdayError: Error, LocalizedError {
   public var errorDescription: String? {
     switch self {
     case .invalidPreferences: return "Choose a valid reminder time and timezone."
-    case .invalidBirthday: return "A birthday is invalid. Correct it in Life Data, then sync again."
+    case .invalidBirthday: return "A birthday is invalid. Correct it in Soma, then sync again."
     case .invalidEndpoint:
       return "Enter an HTTPS endpoint without credentials, a query or a fragment."
     case .invalidResponse:
       return
-        "Life Data returned an incomplete or invalid response. Your saved birthdays are unchanged."
-    case .unauthorized: return "This connection is no longer authorized. Reconnect to Life Data."
-    case .http(let status): return "Life Data request failed (HTTP \(status)). Try again later."
+        "Soma returned an incomplete or invalid response. Your saved birthdays are unchanged."
+    case .unauthorized: return "This connection is no longer authorized. Reconnect to Soma."
+    case .http(let status): return "Soma request failed (HTTP \(status)). Try again later."
     case .adminCredential: return "Use a dedicated app credential, not an operator credential."
     }
   }

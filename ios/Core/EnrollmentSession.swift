@@ -131,7 +131,7 @@ struct EnrollmentFailure: LocalizedError {
         link.scheme == endpoint.scheme, link.host == endpoint.host, link.port == endpoint.port,
         link.user == nil, link.password == nil, link.fragment == nil,
         !(link.absoluteString.removingPercentEncoding ?? "").contains(candidate.token)
-      else { throw EnrollmentFailure("Life Data returned an invalid approval link.") }
+      else { throw EnrollmentFailure("Soma returned an invalid approval link.") }
       let next = Attempt(generation: id, endpoint: endpoint, candidate: candidate, deadline: now() + 300)
       attempt = next
       approvalURL = link
@@ -154,7 +154,7 @@ struct EnrollmentFailure: LocalizedError {
             body["name"] as? String == "device:" + candidate.fingerprint,
             let scopes = body["scopes"] as? [String],
             !scopes.contains("full"), !scopes.contains("admin")
-          else { throw EnrollmentFailure("Life Data did not approve birthday-only access for this device.") }
+          else { throw EnrollmentFailure("Soma did not approve birthday-only access for this device.") }
           let receipt = try await contract.validate(body)
           try check(next)
           phase = .installing
@@ -175,7 +175,7 @@ struct EnrollmentFailure: LocalizedError {
           throw EnrollmentFailure("The connection was not committed. Try again.")
         }
         guard [401, 403, 429].contains(reply.status) || (500...599).contains(reply.status) else {
-          throw EnrollmentFailure("Life Data could not complete approval. Try again.")
+          throw EnrollmentFailure("Soma could not complete approval. Try again.")
         }
         let retry = [429, 503].contains(reply.status) ? reply.retryAfterSeconds ?? 5 : 5
         let delay = retry.isFinite ? max(5, retry) : 5
@@ -223,7 +223,7 @@ struct EnrollmentFailure: LocalizedError {
         let contract, (try? await contract.revoked(reply)) == true {
         return "Approval credential revoked."
       }
-      return "Revocation is not confirmed. If you approve the old link later, revoke that device in Life Data."
+      return "Revocation is not confirmed. If you approve the old link later, revoke that device in Soma."
     }.value
     cleanupMessages[fingerprint] = message
   }

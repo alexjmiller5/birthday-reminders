@@ -37,16 +37,16 @@ struct ReminderSettingsView: View {
           )
         }
         Section("Tasks") {
-          Text("Life Data task reminders are not connected yet.").foregroundStyle(.secondary)
+          Text("Soma task reminders are not connected yet.").foregroundStyle(.secondary)
         }
         if let error = model.error { Section { Text(error).foregroundStyle(.red) } }
         if model.connection != nil {
           Section {
-            Button("Disconnect Life Data", role: .destructive) { confirmDisconnect = true }
+            Button("Disconnect Soma", role: .destructive) { confirmDisconnect = true }
               .disabled(model.busy)
           } footer: {
             Text(
-              "Removes this phone’s saved connection, birthdays and notifications. Your Life Data records stay intact."
+              "Removes this phone’s saved connection, birthdays and notifications. Your Soma records stay intact."
             )
           }
         }
@@ -61,7 +61,7 @@ struct ReminderSettingsView: View {
           ?? Date()
       }
       .confirmationDialog(
-        "Disconnect Life Data?", isPresented: $confirmDisconnect, titleVisibility: .visible
+        "Disconnect Soma?", isPresented: $confirmDisconnect, titleVisibility: .visible
       ) {
         Button("Disconnect", role: .destructive) {
           model.disconnect()

@@ -21,7 +21,7 @@ cases = [
         "sort direction",
     ),
     (
-        "ios/Core/LifeDataClient.swift",
+        "ios/Core/SomaClient.swift",
         '_ = try await contract.validate(request(path: "v1/session", maximumBytes: 65_536))',
         "// Deliberately removed for mutation verification.",
         "OptInTests",

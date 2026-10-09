@@ -6,7 +6,7 @@ let package = Package(
   platforms: [.iOS(.v17), .macOS(.v14)],
   products: [.library(name: "BirthdaysCore", targets: ["BirthdaysCore"])],
   targets: [
-    .target(name: "BirthdaysCore", path: "ios/Core", resources: [.copy("Resources/life-enrollment.js")]),
+    .target(name: "BirthdaysCore", path: "ios/Core", resources: [.copy("Resources/soma-enrollment.js")]),
     .testTarget(name: "BirthdaysCoreTests", dependencies: ["BirthdaysCore"], path: "ios/CoreTests"),
   ]
 )

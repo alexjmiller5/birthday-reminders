@@ -73,7 +73,7 @@ final class BirthdayModel {
         snapshot = saved
       }
       rebuildUpcoming()
-    } catch { self.error = "Saved data could not be loaded. Reconnect to Life Data." }
+    } catch { self.error = "Saved data could not be loaded. Reconnect to Soma." }
   }
 
   // Called only after EnrollmentSession validates the candidate identity/profile.
@@ -93,7 +93,7 @@ final class BirthdayModel {
     do {
       let endpoint = endpoint.trimmingCharacters(in: .whitespacesAndNewlines)
       let token = token.trimmingCharacters(in: .whitespacesAndNewlines)
-      let client = try LifeDataClient(endpoint: endpoint, token: token, session: session)
+      let client = try SomaClient(endpoint: endpoint, token: token, session: session)
       let people = try await client.people(source: source,
         includeRevisions: enrollmentProfile?.id == BirthdaysAccess.editorProfile)
       let value = BirthdaySnapshot(
@@ -135,7 +135,7 @@ final class BirthdayModel {
     if needsOptInRefresh { await reschedule() }
     guard let connection else { return }
     do {
-      let client = try LifeDataClient(
+      let client = try SomaClient(
         endpoint: connection.endpoint, token: connection.token, session: session)
       let people = try await client.people(source: connection.source, includeRevisions: canEditOptIns)
       let value = BirthdaySnapshot(
@@ -171,7 +171,7 @@ final class BirthdayModel {
     defer { busy = false; savingPersonID = nil }
     do {
       let contract = try BirthdaysAccess.editorContract()
-      let client = try LifeDataClient(endpoint: connection.endpoint, token: connection.token, session: session)
+      let client = try SomaClient(endpoint: connection.endpoint, token: connection.token, session: session)
       let saved = try await client.setOptIn(person, enabled: enabled, source: connection.source, contract: contract)
       let value = BirthdaySnapshot(endpoint: connection.endpoint, source: connection.source,
         people: (snapshot?.people ?? []).map { $0.id == saved.id ? saved : $0 },
@@ -183,7 +183,7 @@ final class BirthdayModel {
       try cache.save(value)
       setNeedsOptInRefresh(false)
     } catch BirthdayError.http(409) {
-      error = "This person changed in Life Data. Refresh to see the latest choice before trying again."
+      error = "This person changed in Soma. Refresh to see the latest choice before trying again."
     } catch {
       self.error = "The notification choice could not be confirmed and saved. Refresh before trying again."
     }

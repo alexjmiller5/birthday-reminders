@@ -26,9 +26,9 @@ struct BirthdayListView: View {
         if model.connection == nil {
           Section {
             Text("Your birthdays, together.").font(.title2.bold())
-            Text("Connect Life Data to see upcoming birthdays and receive reminders on this phone.")
+            Text("Connect Soma to see upcoming birthdays and receive reminders on this phone.")
               .foregroundStyle(.secondary)
-            Button("Connect Life Data") { showConnection = true }
+            Button("Connect Soma") { showConnection = true }
               .buttonStyle(.borderedProminent).padding(.vertical, 6)
           }
         } else {
@@ -64,7 +64,7 @@ struct BirthdayListView: View {
           }
           Section {
             if model.upcoming.isEmpty {
-              Text("No birthdays yet. Add birthdays in Life Data, then pull to refresh.")
+              Text("No birthdays yet. Add birthdays in Soma, then pull to refresh.")
                 .foregroundStyle(.secondary)
             }
             if !model.upcoming.isEmpty && model.visibleBirthdays.isEmpty {
@@ -76,7 +76,7 @@ struct BirthdayListView: View {
           } header: {
             Text("Birthdays")
           } footer: {
-            Text("Notification opt-ins are shared through Life Data. Delivery on this phone also requires notification permission.")
+            Text("Notification opt-ins are shared through Soma. Delivery on this phone also requires notification permission.")
           }
         }
       }
@@ -172,7 +172,7 @@ private struct BirthdayRow: View {
       .accessibilityIdentifier("opt-in-\(birthday.id)")
       .disabled(model.busy || !model.canEditOptIns || model.needsOptInRefresh)
       if model.savingPersonID == birthday.id {
-        ProgressView("Saving to Life Data...").font(.footnote)
+        ProgressView("Saving to Soma...").font(.footnote)
       } else if model.isOptInPending(birthday.id) {
         Text("Refresh to confirm this choice. Reminders for this person are paused on this phone.")
           .font(.footnote).foregroundStyle(.secondary)
@@ -220,7 +220,7 @@ private struct BirthdaySortView: View {
             model.saveSortRules(rules)
           }
         } header: { Text("Sort in this order") }
-        footer: { Text("Drag to set priority. Tap a direction to reverse it. Notifications sorts the shared Life Data opt-in.") }
+        footer: { Text("Drag to set priority. Tap a direction to reverse it. Notifications sorts the shared Soma opt-in.") }
         if model.sortRules.count < BirthdaySortRule.Field.allCases.count {
           Section {
             Menu {

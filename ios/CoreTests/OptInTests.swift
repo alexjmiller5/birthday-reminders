@@ -3,10 +3,10 @@ import XCTest
 
 @MainActor final class OptInTests: XCTestCase {
   private let revision = RowRevision(updatedAt: "2030-01-01T00:00:00.000Z", hubAt: "2030-01-01T00:00:01.000Z")
-  private func client() throws -> LifeDataClient {
+  private func client() throws -> SomaClient {
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [StubProtocol.self]
-    return try LifeDataClient(endpoint: "https://example.invalid", token: "fixture", session: URLSession(configuration: config))
+    return try SomaClient(endpoint: "https://example.invalid", token: "fixture", session: URLSession(configuration: config))
   }
   private func body(_ request: URLRequest) throws -> [String: Any] {
     if let data = request.httpBody { return try JSONSerialization.jsonObject(with: data) as! [String: Any] }

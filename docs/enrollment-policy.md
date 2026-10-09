@@ -1,7 +1,7 @@
 # Canonical enrollment policy
 
-The bundled `ios/Core/Resources/life-enrollment.js` is the minimal IIFE supplied
-by Life Core, with no local policy edits. It exports the public enrollment
+The bundled `ios/Core/Resources/soma-enrollment.js` is the minimal IIFE supplied
+by Soma Core, with no local policy edits. It exports the public enrollment
 functions only. `CoreEnrollmentPolicy` loads it into JavaScriptCore and passes
 JSON across the realm boundary. New connections expect `birthdays-editor-v1`:
 People id/name/birthday/notify_birthday/deleted_at/updated_at/hub_at reads and
@@ -17,7 +17,7 @@ receipts retain the actual revision in device-only Keychain.
 
 Provenance:
 
-- Source: https://github.com/alexjmiller5/life-data/pull/23
+- Source: https://github.com/alexjmiller5/soma/pull/23
 - Commit: `88bbd6210782c1ccef15e0b7805225f0a6398398`
 - Public entry: `life-core/enrollment`, `core/src/enrollment.ts`
 - Contract: `40ce1fb59bfe27a26bc878b193d694414c3b491fdc365cb421a96000b6b1c3a0`
@@ -29,7 +29,7 @@ minification, and this entry (resolved to the pinned source):
 
 ```ts
 import {ENROLLMENT_POLICY,enrollmentApproval,validateDeviceSession,enrollmentPollResult,sessionRevocationResult} from 'life-core/enrollment';
-Object.assign(globalThis,{LifeEnrollment:{ENROLLMENT_POLICY,enrollmentApproval,validateDeviceSession,enrollmentPollResult,sessionRevocationResult}});
+Object.assign(globalThis,{SomaEnrollment:{ENROLLMENT_POLICY,enrollmentApproval,validateDeviceSession,enrollmentPollResult,sessionRevocationResult}});
 ```
 
 For an update, obtain Core's reviewed source/artifact and conformance evidence,

@@ -1,11 +1,11 @@
 # AGENTS.md
 
-The native iOS app lives in `ios/`. It reads birthdays through Life Data's
+The native iOS app lives in `ios/`. It reads birthdays through Soma's
 supported API and schedules its own local notifications. `Package.swift`
 exposes `BirthdaysCore` for fast macOS tests. Its enrollment policy bundles
-the reviewed Life Core public entry into the system JavaScriptCore framework.
+the reviewed Soma Core public entry into the system JavaScriptCore framework.
 
-The Python Life Data Tasks adapter is dormant. There is no server entrypoint,
+The Python Soma Tasks adapter is dormant. There is no server entrypoint,
 active birthday cron or automatic deployment workflow. Main pushes run checks.
 
 ## Native app
@@ -15,7 +15,7 @@ for installed identity and Keychain continuity. Task occurrence IDs and their
 application namespace are stable across display-name changes.
 
 - `ios/project.yml` owns the generated Xcode project; never edit `.xcodeproj`.
-- `ios/Core/`: date validation, reminder planning, paginated Life Data reads,
+- `ios/Core/`: date validation, reminder planning, paginated Soma reads,
   atomic snapshot cache and notification reconciliation. No SwiftUI imports.
 - `ios/App/`: SwiftUI, Keychain, UserNotifications, application lifecycle.
 - Run `swift test --scratch-path /tmp/birthdays-swift-build` for core
@@ -28,7 +28,7 @@ application namespace are stable across display-name changes.
   New connections use profile `birthdays-editor-v1` and exact scopes declared
   in `BirthdaysAccess`: seven People read columns and patch-only notify_birthday.
   Existing reader connections retain five-column reads until explicit browser
-  reenrollment. Never substitute Life UI's full-replica `/login` contract.
+  reenrollment. Never substitute Iris's full-replica `/login` contract.
 - Credentials belong in this app's device-only Keychain, never the bundle,
   defaults, URLs or diagnostics. Core owns exact scope/identity receipt validation;
   phone People read and Tasks writer use separate identities. Candidate cleanup
@@ -36,7 +36,7 @@ application namespace are stable across display-name changes.
 - An approved installer must check its enrollment attempt before committing.
   Save the cache before replacing Keychain; failed/canceled enrollment preserves
   the previously accepted connection. Notification testing needs no enrollment.
-- Source opt-ins come from Life Data. Toggle writes use its conditional patch
+- Source opt-ins come from Soma. Toggle writes use its conditional patch
   with cached updated_at/hub_at revisions and canonical live session validation.
   Confirmed saves reconcile notifications; uncertain/conflicting writes persist
   a refresh gate across restarts. No automatic write retries. Mutes remain
@@ -44,13 +44,13 @@ application namespace are stable across display-name changes.
 - Schedule at most 60 grouped birthday dates, show the renewal deadline,
   and retain cached people when refresh fails. Local notifications do not
   execute a daily task-writing job.
-- `src/core/life_tasks.py` plans Tasks rows against the published catalog and
-  calls `/v1/rows/create` with the pinned canonical Life Core Python validator.
+- `src/core/soma_tasks.py` plans Tasks rows against the published catalog and
+  calls `/v1/rows/create` with the pinned canonical Soma Core Python validator.
   It is not connected to the cron. Live activation requires the exact configured
   policy/credential receipt, complete People reads,
   reviewed historical occurrence mappings and explicit creation policy. Never use a provisional
   table or write Notion as a native fallback.
-- Task IDs use the durable application namespace in `life_tasks.py`, UUIDv5
+- Task IDs use the durable application namespace in `soma_tasks.py`, UUIDv5
   over UTF-8 compact JSON `["v1","birthday",personId,occurrenceYear]`, with
   byte-exact person IDs. Preserve retained occurrence mappings first. Keep
   birthday due dates as calendar labels; edit timestamps do not alter identity.
@@ -59,7 +59,7 @@ application namespace are stable across display-name changes.
   ID; missing adopted targets fail closed. Missing dates are skipped.
   `created` confirms the atomic task/origin result; `existing` makes no creation
   attribution. Errors stop requests and retain earlier validated receipts.
-- Consumer access uses dedicated Life Data credentials through its API only.
+- Consumer access uses dedicated Soma credentials through its API only.
   Exact-table grants are whole-table grants, not enforced column projection.
   The phone reader and daily Tasks writer enroll independently. The writer's
   exact policy-bound create grant and five People read-column grants must pass
@@ -73,7 +73,7 @@ application namespace are stable across display-name changes.
   certificate/password and wildcard profile, read by this project's CI account.
   Apple Signing owns renewal; rotating its material affects its documented Apple
   app consumers. App runtime never receives it. Project ENV owns IOS_DEVICE_ID
-  and IOS_BUNDLE_ID. This does not authorize broad Life Data access.
+  and IOS_BUNDLE_ID. This does not authorize broad Soma access.
 - Install a decrypted, verified CI IPA through `_install`, with IOS_INSTALL_HOST
   selecting the paired Mac. Local Debug requires IOS_DEVELOPMENT_TEAM and usable
   development signing; local Release is a stated-reason fallback requiring
@@ -82,13 +82,13 @@ application namespace are stable across display-name changes.
 ## Python Tasks adapter
 
 Business logic lives in `src/core/` as plain Python with no provider runtime
-imports. `life_tasks.py` is a library, not an active task-writing job. Activation
+imports. `soma_tasks.py` is a library, not an active task-writing job. Activation
 requires the verified dedupe and scoped service contracts above, plus an explicit
 runtime implementation. Never add a Notion or ntfy fallback.
 
 ## Stack and commands
 
-uv, httpx, pinned Life Core validators, pytest and ruff. Run `just test`,
+uv, httpx, pinned Soma Core validators, pytest and ruff. Run `just test`,
 `just check` and `just fmt` for tests, read-only checks and formatting.
 Write tests before changing the adapter. Use the native justfile for app builds
 and installation. Native releases remain manually dispatched; CI does not

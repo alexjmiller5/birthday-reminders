@@ -21,11 +21,11 @@ final class StubProtocol: URLProtocol {
   override func stopLoading() {}
 }
 
-final class LifeDataTests: XCTestCase {
-  private func client() throws -> LifeDataClient {
+final class SomaTests: XCTestCase {
+  private func client() throws -> SomaClient {
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [StubProtocol.self]
-    return try LifeDataClient(
+    return try SomaClient(
       endpoint: "https://example.invalid", token: "test-credential",
       session: URLSession(configuration: config))
   }
@@ -98,7 +98,7 @@ final class LifeDataTests: XCTestCase {
       "http://example.invalid", "https://u:p@example.invalid", "https://example.invalid?token=x",
       "https://example.invalid#x",
     ] {
-      XCTAssertThrowsError(try LifeDataClient(endpoint: url, token: "test"))
+      XCTAssertThrowsError(try SomaClient(endpoint: url, token: "test"))
     }
   }
 
